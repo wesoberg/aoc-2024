@@ -1,62 +1,77 @@
 use aoc_2024_rs::*;
 
 fn parse_input(input: String) -> Vec<Vec<usize>> {
-    let mut lines = Vec::new();
-    for line in input.trim().lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        lines.push(
+    input
+        .trim()
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
             line.split_whitespace()
                 .map(|i| i.parse().unwrap())
-                .collect(),
-        );
-    }
-    lines
+                .collect()
+        })
+        .collect()
 }
 
-fn is_safe(report: &Vec<usize>) -> bool {
+fn is_safe(report: &Vec<usize>, tolerance: usize) -> bool {
     let mut inc = false;
     let mut dec = false;
-    let mut same = false;
-    let mut out_of_range = false;
-    for i in 1..report.len() {
-        let a = report[i - 1];
-        let b = report[i];
+
+    // 0 1 2 3 4 5
+    // i j T       # process pair, incr both
+    //   i j j     # incr j again, process pair, incr both
+    //     i i j   # incr i again, conditionally incr j, process pair
+    //         i j # process pair, incr both
+
+    let mut i = 0;
+    let mut j = 1;
+    loop {
+        if i == tolerance {
+            i += 1;
+            if i == j {
+                j += 1;
+            }
+        } else if j == tolerance {
+            j += 1;
+        }
+
+        if j >= report.len() {
+            break;
+        }
+
+        let a = report[i];
+        let b = report[j];
+
         if a < b {
+            if dec {
+                return false;
+            }
             inc = true;
         }
-        if a == b {
-            same = true;
-        }
         if a > b {
+            if inc {
+                return false;
+            }
             dec = true;
         }
         let d = a.abs_diff(b);
         if d < 1 || d > 3 {
-            out_of_range = true;
+            return false;
         }
+
+        i += 1;
+        j += 1;
     }
-    //println!(
-    //    "{:?} inc={}, dec={}, same={}, out_of_range={}",
-    //    report, inc, dec, same, out_of_range
-    //);
-    (inc ^ dec) && !(same || out_of_range)
+
+    inc ^ dec
 }
 
-fn is_safe_with_toleration(report: Vec<usize>) -> bool {
-    if is_safe(&report) {
+fn is_safe_with_toleration(report: &Vec<usize>) -> bool {
+    if is_safe(&report, usize::MAX) {
         return true;
     }
-    let mut candidate = Vec::new();
     for i in 0..report.len() {
-        candidate.clear();
-        for j in 0..report.len() {
-            if i != j {
-                candidate.push(report[j]);
-            }
-        }
-        if is_safe(&candidate) {
+        if is_safe(&report, i) {
             return true;
         }
     }
@@ -66,7 +81,7 @@ fn is_safe_with_toleration(report: Vec<usize>) -> bool {
 fn solve(parsed: Vec<Vec<usize>>) -> usize {
     let mut accumulator = 0;
     for report in parsed {
-        if is_safe_with_toleration(report) {
+        if is_safe_with_toleration(&report) {
             accumulator += 1;
         }
     }
@@ -95,7 +110,7 @@ mod tests {
 1 3 6 7 9
         "
         .to_string();
-        let expected = vec![
+        let expected_parse = vec![
             vec![7, 6, 4, 2, 1],
             vec![1, 2, 7, 8, 9],
             vec![9, 7, 6, 2, 1],
@@ -104,7 +119,13 @@ mod tests {
             vec![1, 3, 6, 7, 9],
         ];
         let parsed = parse_input(input);
-        assert_eq!(expected, parsed);
+        assert_eq!(expected_parse, parsed);
+
+        let expected_safe = vec![true, false, false, true, true, true];
+        assert_eq!(expected_parse.len(), expected_safe.len());
+        for (parse, safe) in expected_parse.iter().zip(expected_safe) {
+            assert_eq!(safe, is_safe_with_toleration(parse));
+        }
 
         assert_eq!(4, solve(parsed));
     }
