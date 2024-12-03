@@ -100,7 +100,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn day02a_example1() {
+    fn day02b_example1() {
         let input = "
 7 6 4 2 1
 1 2 7 8 9
