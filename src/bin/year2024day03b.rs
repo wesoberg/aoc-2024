@@ -12,8 +12,10 @@ enum Item {
 
 fn parse_input(input: String) -> Vec<Item> {
     // I thought this was the de facto crate for regex, but it doesn't support exposing the capture
-    // indexes, and it doesn't support variadic capture groups. You can get indexes on matches, but
-    // then have to parse again? Weird stuff! Spent an hour tinkering on this nonsense. :D
+    // indexes, and it doesn't support variadic capture groups (turns out that's only with
+    // .extract() in particular though, which to be fair IS called out in the docs I didn't read
+    // for that particular method). You can get indexes on matches, but then have to parse again?
+    // Weird stuff! Spent an hour tinkering on this nonsense. :D
 
     let p = [
         r"(mul\([0-9]{1,3},[0-9]{1,3}\))",
