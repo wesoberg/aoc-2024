@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use aoc_2024_rs::*;
 
@@ -37,20 +37,14 @@ fn parse_input(input: String) -> Manual {
                     .collect::<Vec<i32>>(),
             );
 
-            // NOTE: This was not working out quickly, but verified in Python shell that all the
-            // pages have unique numbers per page.
-            //assert_eq!(
-            //    HashSet::from_iter(
-            //        manual
-            //            .pages
-            //            .get(manual.pages.len() - 1)
-            //            .unwrap()
-            //            .iter()
-            //            .cloned()
-            //    )
-            //    .len(),
-            //    manual.pages.len()
-            //);
+            assert_eq!(
+                manual.pages[manual.pages.len() - 1]
+                    .iter()
+                    .cloned()
+                    .collect::<HashSet<i32>>()
+                    .len(),
+                manual.pages[manual.pages.len() - 1].len()
+            );
         }
     }
 

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use aoc_2024_rs::*;
 
@@ -37,20 +37,14 @@ fn parse_input(input: String) -> Manual {
                     .collect::<Vec<i32>>(),
             );
 
-            // NOTE: This was not working out quickly, but verified in Python shell that all the
-            // pages have unique numbers per page.
-            //assert_eq!(
-            //    HashSet::from_iter(
-            //        manual
-            //            .pages
-            //            .get(manual.pages.len() - 1)
-            //            .unwrap()
-            //            .iter()
-            //            .cloned()
-            //    )
-            //    .len(),
-            //    manual.pages.len()
-            //);
+            assert_eq!(
+                manual.pages[manual.pages.len() - 1]
+                    .iter()
+                    .cloned()
+                    .collect::<HashSet<i32>>()
+                    .len(),
+                manual.pages[manual.pages.len() - 1].len()
+            );
         }
     }
 
@@ -77,14 +71,11 @@ fn is_correct(rules: &Vec<(i32, i32)>, page: &Vec<i32>) -> bool {
 }
 
 fn re_order(rules: &Vec<(i32, i32)>, page: &Vec<i32>) -> Vec<i32> {
-    let mut indices = HashMap::new();
-    for (i, c) in page.iter().enumerate() {
-        indices.insert(c, i);
-    }
-
     let mut ordered = page.clone();
     while !is_correct(rules, &ordered) {
         for (a, b) in rules {
+            // NOTE: It's faster to seek every time than to mutate the indices HashMap with
+            // indices.remove() and indices.insert() again.
             match (
                 ordered.iter().position(|v| v == a),
                 ordered.iter().position(|v| v == b),
