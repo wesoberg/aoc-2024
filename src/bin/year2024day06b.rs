@@ -131,7 +131,8 @@ fn patrol(state: &State) -> (HashSet<((i32, i32), Direction)>, bool) {
     let mut guard_at = state.guard_at;
     let mut guard_face = state.guard_face;
 
-    let mut visited = HashSet::new();
+    let mut visited =
+        HashSet::with_capacity((state.bbox.1 .0 * state.bbox.1 .1).try_into().unwrap());
     visited.insert((guard_at, guard_face));
 
     loop {
@@ -142,10 +143,9 @@ fn patrol(state: &State) -> (HashSet<((i32, i32), Direction)>, bool) {
                 Tile::Open => {
                     guard_at = next_at;
                     let key = (guard_at, guard_face);
-                    if visited.contains(&key) {
+                    if !visited.insert(key) {
                         return (visited, true);
                     }
-                    visited.insert(key);
                 }
                 Tile::Obstruction => {
                     guard_face = guard_face.rotate_right();
