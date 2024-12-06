@@ -51,6 +51,17 @@ fn parse_input(input: String) -> Manual {
     manual
 }
 
+// could try something like this:
+// given the entries in the page,
+// what rules apply?
+// then build a tree of the rules that apply
+// and topo sort them
+// it's a correct page if it matches the sort,
+// otherwise the sorted traversal (?) is the corrected version
+//
+// probably then want to assert that the set of page entries is the set of rules elements
+// on initial parse above.
+
 fn is_correct(rules: &Vec<(i32, i32)>, page: &Vec<i32>) -> bool {
     let mut indices = HashMap::new();
     for (i, c) in page.iter().enumerate() {
