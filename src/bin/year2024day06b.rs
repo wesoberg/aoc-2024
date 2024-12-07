@@ -212,6 +212,13 @@ fn patrol(state: &State) -> (FxHashSet<(Point2, Direction)>, bool) {
 
 // TODO: Could probably use "vectors" instead of individual steps?
 // Or maybe pre-compute jumps?
+//
+// TODO: Hashing is still the slowest part, even after switching to one of the supposedly fastest
+// hashing algorithm crates out there. May want to try Vec<Vec<bool>> and equivalents, just to see
+// how it performs in comparison. Maybe Vec<bool> (flattened with access formula) would be even
+// better than that? Maybe even bitwise masks even better (can you do an arbitrary series of bytes
+// in Rust? well there's probably a crate)? Could potentially do bytes and have enum flags in there
+// for directions and such?
 
 fn get_looping_obstacles(state: &State) -> FxHashSet<Point2> {
     let mut current = state.clone();
