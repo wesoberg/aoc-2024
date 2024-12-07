@@ -65,7 +65,7 @@ fn get_steps(word_len: i32) -> Vec<Vec<(i32, i32)>> {
 }
 
 fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
-    let word = vec!['X', 'M', 'A', 'S'];
+    let word = ['X', 'M', 'A', 'S'];
     let steps = get_steps(word.len().try_into().unwrap());
 
     let mut hits = Vec::new();

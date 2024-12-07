@@ -13,7 +13,7 @@ fn parse_input(input: String) -> Vec<Vec<usize>> {
         .collect()
 }
 
-fn is_safe(report: &Vec<usize>, tolerance: usize) -> bool {
+fn is_safe(report: &[usize], tolerance: usize) -> bool {
     let mut inc = false;
     let mut dec = false;
 
@@ -55,7 +55,7 @@ fn is_safe(report: &Vec<usize>, tolerance: usize) -> bool {
             dec = true;
         }
         let d = a.abs_diff(b);
-        if d < 1 || d > 3 {
+        if !(1..=3).contains(&d) {
             return false;
         }
 
@@ -66,16 +66,16 @@ fn is_safe(report: &Vec<usize>, tolerance: usize) -> bool {
     inc ^ dec
 }
 
-fn is_safe_with_toleration(report: &Vec<usize>) -> bool {
-    if is_safe(&report, usize::MAX) {
+fn is_safe_with_toleration(report: &[usize]) -> bool {
+    if is_safe(report, usize::MAX) {
         return true;
     }
     for i in 0..report.len() {
-        if is_safe(&report, i) {
+        if is_safe(report, i) {
             return true;
         }
     }
-    return false;
+    false
 }
 
 fn solve(parsed: Vec<Vec<usize>>) -> usize {

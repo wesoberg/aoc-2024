@@ -81,7 +81,7 @@ fn is_possible(equation: &Equation) -> bool {
     false
 }
 
-fn solve(parsed: &Vec<Equation>) -> u64 {
+fn solve(parsed: &[Equation]) -> u64 {
     parsed
         .iter()
         .filter_map(|e| if is_possible(e) { Some(e.value) } else { None })

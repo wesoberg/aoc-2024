@@ -47,8 +47,8 @@ fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
     let anchor_value = 'A';
     let neighbor_values = HashSet::from([Some(&'M'), Some(&'S')]);
 
-    let forward_neighbor_steps = vec![(-1, -1), (1, 1)];
-    let backward_neighbor_steps = vec![(1, -1), (-1, 1)];
+    let forward_neighbor_steps = [(-1, -1), (1, 1)];
+    let backward_neighbor_steps = [(1, -1), (-1, 1)];
 
     let mut hits = Vec::new();
 

@@ -24,7 +24,7 @@ fn parse_input(input: String) -> Manual {
             let chunks: Vec<&str> = line.trim().split("|").collect();
             assert!(chunks.len() == 2);
             manual.rules.push((
-                chunks.get(0).unwrap().parse().unwrap(),
+                chunks.first().unwrap().parse().unwrap(),
                 chunks.get(1).unwrap().parse().unwrap(),
             ));
         } else if line.contains(',') {
@@ -51,23 +51,20 @@ fn parse_input(input: String) -> Manual {
     manual
 }
 
-fn is_correct(rules: &Vec<(i32, i32)>, page: &Vec<i32>) -> bool {
+fn is_correct(rules: &Vec<(i32, i32)>, page: &[i32]) -> bool {
     let mut indices = HashMap::new();
     for (i, c) in page.iter().enumerate() {
         indices.insert(c, i);
     }
 
     for (a, b) in rules {
-        match (indices.get(a), indices.get(b)) {
-            (Some(ia), Some(ib)) => {
-                if ia > ib {
-                    return false;
-                }
+        if let (Some(ia), Some(ib)) = (indices.get(a), indices.get(b)) {
+            if ia > ib {
+                return false;
             }
-            _ => {}
         }
     }
-    return true;
+    true
 }
 
 fn solve(parsed: Manual) -> i32 {
@@ -128,17 +125,14 @@ mod tests {
         .to_string();
         let parsed = parse_input(input);
 
-        assert_eq!(&(47, 53), parsed.rules.get(0).unwrap());
+        assert_eq!(&(47, 53), parsed.rules.first().unwrap());
         assert_eq!(&(97, 13), parsed.rules.get(1).unwrap());
         assert_eq!(&(97, 61), parsed.rules.get(2).unwrap());
         assert_eq!(&(75, 13), parsed.rules.get(parsed.rules.len() - 2).unwrap());
-        assert_eq!(&(53, 13), parsed.rules.get(parsed.rules.len() - 1).unwrap());
+        assert_eq!(&(53, 13), parsed.rules.last().unwrap());
 
-        assert_eq!(&vec![75, 47, 61, 53, 29], parsed.pages.get(0).unwrap());
-        assert_eq!(
-            &vec![97, 13, 75, 29, 47],
-            parsed.pages.get(parsed.pages.len() - 1).unwrap()
-        );
+        assert_eq!(&vec![75, 47, 61, 53, 29], parsed.pages.first().unwrap());
+        assert_eq!(&vec![97, 13, 75, 29, 47], parsed.pages.last().unwrap());
 
         let expected_correct = vec![true, true, true, false, false, false];
         for (page, expect) in parsed.pages.iter().zip(expected_correct) {

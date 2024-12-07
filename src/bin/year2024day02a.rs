@@ -13,7 +13,7 @@ fn parse_input(input: String) -> Vec<Vec<usize>> {
         .collect()
 }
 
-fn is_safe(report: &Vec<usize>) -> bool {
+fn is_safe(report: &[usize]) -> bool {
     let mut inc = false;
     let mut dec = false;
     let mut same = false;
@@ -31,7 +31,7 @@ fn is_safe(report: &Vec<usize>) -> bool {
             dec = true;
         }
         let d = a.abs_diff(b);
-        if d < 1 || d > 3 {
+        if !(1..=3).contains(&d) {
             out_of_range = true;
         }
     }
@@ -84,7 +84,7 @@ mod tests {
         let expected_safe = vec![true, false, false, false, false, true];
         assert_eq!(expected_parse.len(), expected_safe.len());
         for (parse, safe) in expected_parse.iter().zip(expected_safe) {
-            assert_eq!(safe, is_safe(&parse));
+            assert_eq!(safe, is_safe(parse));
         }
 
         assert_eq!(2, solve(parsed));

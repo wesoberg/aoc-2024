@@ -31,7 +31,7 @@ fn solve(parsed: Vec<(usize, usize)>) -> usize {
     let mut accumulator = 0;
     let col1_counts = count_occurrences(parsed.iter().map(|p| p.1).collect());
     for (col0, _) in parsed {
-        accumulator += col0 * col1_counts.get(&col0).or(Some(&0)).unwrap();
+        accumulator += col0 * col1_counts.get(&col0).unwrap_or(&0);
     }
     accumulator
 }

@@ -73,18 +73,17 @@ impl Validate {
 
     fn is_possible(&mut self, equation: &Equation) -> bool {
         let ops_size = equation.parts.len() - 1;
-        if !self.ops_cache.contains_key(&ops_size) {
+        self.ops_cache.entry(ops_size).or_insert_with(|| {
             // Almost half the runtime is in this stuff, hence the caching here. Might be faster to
             // implement a non-generic version?
 
-            let permutations = repeat_n(
+            repeat_n(
                 vec![Operator::Add, Operator::Mul, Operator::Cat].into_iter(),
                 ops_size,
             )
             .multi_cartesian_product()
-            .collect_vec();
-            self.ops_cache.insert(ops_size, permutations);
-        }
+            .collect_vec()
+        });
 
         if DEBUG {
             println!("{:?}", equation);
@@ -136,7 +135,7 @@ impl Validate {
     }
 }
 
-fn solve(parsed: &Vec<Equation>) -> u64 {
+fn solve(parsed: &[Equation]) -> u64 {
     let mut validator = Validate::new();
     parsed
         .iter()

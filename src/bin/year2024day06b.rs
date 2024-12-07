@@ -136,7 +136,7 @@ impl State {
     fn get(&self, p: &Point2) -> Option<Tile> {
         if !self.bbox.contains(p) {
             None
-        } else if self.obstructions.contains(&p) {
+        } else if self.obstructions.contains(p) {
             Some(Tile::Obstruction)
         } else if *p == self.guard_at {
             Some(Tile::Guard(self.guard_face))
@@ -292,7 +292,7 @@ mod tests {
             parsed.bbox
         );
 
-        let expected_loops = vec![
+        let expected_loops = [
             Point2::new(3, 6),
             Point2::new(6, 7),
             Point2::new(7, 7),
