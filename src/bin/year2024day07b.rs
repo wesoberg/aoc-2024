@@ -23,8 +23,20 @@ impl Operator {
         match self {
             Operator::Add => lhs + rhs,
             Operator::Mul => lhs * rhs,
-            // I did look up this formula but was aware of it.
-            Operator::Cat => lhs * (10u64.pow(rhs.ilog10() + 1)) + rhs,
+            Operator::Cat => {
+                // Adding these simpler preconditions saved a little bit of time.
+                // Another tip I saw on the subreddit.
+                if rhs < 10 {
+                    lhs * 10 + rhs
+                } else if rhs < 100 {
+                    lhs * 100 + rhs
+                } else if rhs < 1_000 {
+                    lhs * 1000 + rhs
+                } else {
+                    // I did look up this formula but was aware of it.
+                    lhs * (10u64.pow(rhs.ilog10() + 1)) + rhs
+                }
+            }
         }
     }
 }
@@ -124,6 +136,13 @@ impl Validate {
                 lhs = Some(op.unwrap().apply(lhs.unwrap(), rhs.unwrap()));
                 rhs = None;
                 op = None;
+
+                // Saw this tip in the subreddit and did not expect it to really do much. It did
+                // _everything_, wow! The "prune the search space" has _already_ started making a
+                // big difference this year...
+                if lhs.unwrap() > equation.value {
+                    return false;
+                }
             }
 
             if lhs.unwrap() == equation.value {
