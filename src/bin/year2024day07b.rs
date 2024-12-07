@@ -1,7 +1,9 @@
-use std::collections::VecDeque;
+use std::collections::HashMap;
 
 use aoc_2024_rs::*;
 use itertools::{repeat_n, Itertools};
+
+const DEBUG: bool = false;
 
 #[derive(Debug, PartialEq)]
 struct Equation {
@@ -9,7 +11,7 @@ struct Equation {
     parts: Vec<u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum Operator {
     Add,
     Mul,
@@ -21,7 +23,8 @@ impl Operator {
         match self {
             Operator::Add => lhs + rhs,
             Operator::Mul => lhs * rhs,
-            Operator::Cat => (lhs.to_string() + &rhs.to_string()).parse().unwrap(),
+            // I did look up this formula but was aware of it.
+            Operator::Cat => lhs * (10u64.pow(rhs.ilog10() + 1)) + rhs,
         }
     }
 }
@@ -57,36 +60,93 @@ fn parse_input(input: String) -> Vec<Equation> {
     equations
 }
 
-fn is_possible(equation: &Equation) -> bool {
-    let permutations = repeat_n(
-        vec![Operator::Add, Operator::Mul, Operator::Cat].into_iter(),
-        equation.parts.len() - 1,
-    )
-    .multi_cartesian_product();
+struct Validate {
+    ops_cache: HashMap<usize, Vec<Vec<Operator>>>,
+}
 
-    for ops in permutations {
-        let mut part_queue = VecDeque::from(equation.parts.clone());
-        let mut op_queue = VecDeque::from(ops);
-
-        while part_queue.len() > 1 {
-            let lhs = part_queue.pop_front().unwrap();
-            let rhs = part_queue.pop_front().unwrap();
-            let op = op_queue.pop_front().unwrap();
-            part_queue.push_front(op.apply(lhs, rhs));
-        }
-
-        if *part_queue.front().unwrap() == equation.value {
-            return true;
+impl Validate {
+    fn new() -> Self {
+        Self {
+            ops_cache: HashMap::new(),
         }
     }
 
-    false
+    fn is_possible(&mut self, equation: &Equation) -> bool {
+        let ops_size = equation.parts.len() - 1;
+        if !self.ops_cache.contains_key(&ops_size) {
+            // Almost half the runtime is in this stuff, hence the caching here. Might be faster to
+            // implement a non-generic version?
+
+            let permutations = repeat_n(
+                vec![Operator::Add, Operator::Mul, Operator::Cat].into_iter(),
+                ops_size,
+            )
+            .multi_cartesian_product()
+            .collect_vec();
+            self.ops_cache.insert(ops_size, permutations);
+        }
+
+        if DEBUG {
+            println!("{:?}", equation);
+        }
+
+        for ops in self.ops_cache.get(&ops_size).unwrap() {
+            let mut lhs = None;
+            let mut rhs = None;
+            let mut op = None;
+
+            let mut i = 0;
+            let mut j = 0;
+
+            if DEBUG {
+                println!("  {:?}", ops);
+            }
+
+            while i < equation.parts.len() {
+                if DEBUG {
+                    println!("    {:?} {:?} {:?}", op, lhs, rhs);
+                }
+
+                // This was faster than something like "match (op, lhs, rhs)", presumably because
+                // that variant had additional loop iterations?
+
+                if lhs.is_none() {
+                    lhs = Some(equation.parts[i]);
+                    i += 1;
+                }
+                if rhs.is_none() {
+                    rhs = Some(equation.parts[i]);
+                    i += 1;
+                }
+                if op.is_none() {
+                    op = Some(ops[j]);
+                    j += 1;
+                }
+                lhs = Some(op.unwrap().apply(lhs.unwrap(), rhs.unwrap()));
+                rhs = None;
+                op = None;
+            }
+
+            if lhs.unwrap() == equation.value {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 fn solve(parsed: &Vec<Equation>) -> u64 {
+    let mut validator = Validate::new();
     parsed
         .iter()
-        .filter_map(|e| if is_possible(e) { Some(e.value) } else { None })
+        .filter_map(|e| {
+            if validator.is_possible(e) {
+                Some(e.value)
+            } else {
+                None
+            }
+        })
         .sum()
 }
 
@@ -133,6 +193,10 @@ mod tests {
             },
             parsed[parsed.len() - 1]
         );
+
+        assert_eq!(156, Operator::Cat.apply(15, 6));
+        assert_eq!(86, Operator::Cat.apply(8, 6));
+        assert_eq!(178, Operator::Cat.apply(17, 8));
 
         assert_eq!(11387, solve(&parsed));
     }
