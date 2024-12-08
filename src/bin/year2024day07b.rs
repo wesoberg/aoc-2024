@@ -1,9 +1,4 @@
-use std::collections::HashMap;
-
 use aoc_2024_rs::*;
-use itertools::{repeat_n, Itertools};
-
-const DEBUG: bool = false;
 
 #[derive(Debug, PartialEq)]
 struct Equation {
@@ -31,7 +26,7 @@ impl Operator {
                 } else if rhs < 100 {
                     lhs * 100 + rhs
                 } else if rhs < 1_000 {
-                    lhs * 1000 + rhs
+                    lhs * 1_000 + rhs
                 } else {
                     // I did look up this formula but was aware of it.
                     lhs * (10u64.pow(rhs.ilog10() + 1)) + rhs
@@ -72,94 +67,19 @@ fn parse_input(input: String) -> Vec<Equation> {
     equations
 }
 
-struct Validate {
-    ops_cache: HashMap<usize, Vec<Vec<Operator>>>,
-}
-
-impl Validate {
-    fn new() -> Self {
-        Self {
-            ops_cache: HashMap::new(),
-        }
-    }
-
-    fn is_possible(&mut self, equation: &Equation) -> bool {
-        let ops_size = equation.parts.len() - 1;
-        self.ops_cache.entry(ops_size).or_insert_with(|| {
-            // Almost half the runtime is in this stuff, hence the caching here. Might be faster to
-            // implement a non-generic version?
-
-            repeat_n(
-                vec![Operator::Add, Operator::Mul, Operator::Cat].into_iter(),
-                ops_size,
-            )
-            .multi_cartesian_product()
-            .collect_vec()
-        });
-
-        if DEBUG {
-            println!("{:?}", equation);
-        }
-
-        for ops in self.ops_cache.get(&ops_size).unwrap() {
-            let mut lhs = None;
-            let mut rhs = None;
-            let mut op = None;
-
-            let mut i = 0;
-            let mut j = 0;
-
-            if DEBUG {
-                println!("  {:?}", ops);
-            }
-
-            while i < equation.parts.len() {
-                if DEBUG {
-                    println!("    {:?} {:?} {:?}", op, lhs, rhs);
-                }
-
-                // This was faster than something like "match (op, lhs, rhs)", presumably because
-                // that variant had additional loop iterations?
-
-                if lhs.is_none() {
-                    lhs = Some(equation.parts[i]);
-                    i += 1;
-                }
-                if rhs.is_none() {
-                    rhs = Some(equation.parts[i]);
-                    i += 1;
-                }
-                if op.is_none() {
-                    op = Some(ops[j]);
-                    j += 1;
-                }
-                lhs = Some(op.unwrap().apply(lhs.unwrap(), rhs.unwrap()));
-                rhs = None;
-                op = None;
-
-                // Saw this tip in the subreddit and did not expect it to really do much. It did
-                // _everything_, wow! The "prune the search space" has _already_ started making a
-                // big difference this year...
-                if lhs.unwrap() > equation.value {
-                    return false;
-                }
-            }
-
-            if lhs.unwrap() == equation.value {
-                return true;
-            }
-        }
-
-        false
-    }
+fn is_possible(acc: u64, parts: &[u64], target: u64) -> bool {
+    (acc == target && parts.is_empty())
+        || ((acc <= target && !parts.is_empty())
+            && (is_possible(Operator::Add.apply(acc, parts[0]), &parts[1..], target)
+                || is_possible(Operator::Mul.apply(acc, parts[0]), &parts[1..], target)
+                || is_possible(Operator::Cat.apply(acc, parts[0]), &parts[1..], target)))
 }
 
 fn solve(parsed: &[Equation]) -> u64 {
-    let mut validator = Validate::new();
     parsed
         .iter()
         .filter_map(|e| {
-            if validator.is_possible(e) {
+            if is_possible(e.parts[0], &e.parts[1..], e.value) {
                 Some(e.value)
             } else {
                 None

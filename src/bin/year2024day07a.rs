@@ -1,7 +1,4 @@
-use std::collections::VecDeque;
-
 use aoc_2024_rs::*;
-use itertools::{repeat_n, Itertools};
 
 #[derive(Debug, PartialEq)]
 struct Equation {
@@ -55,40 +52,23 @@ fn parse_input(input: String) -> Vec<Equation> {
     equations
 }
 
-fn is_possible(equation: &Equation) -> bool {
-    let permutations = repeat_n(
-        vec![Operator::Add, Operator::Mul].into_iter(),
-        equation.parts.len() - 1,
-    )
-    .multi_cartesian_product();
-
-    for ops in permutations {
-        let mut part_queue = VecDeque::from(equation.parts.clone());
-        let mut op_queue = VecDeque::from(ops);
-
-        while part_queue.len() > 1 {
-            let lhs = part_queue.pop_front().unwrap();
-            let rhs = part_queue.pop_front().unwrap();
-            let op = op_queue.pop_front().unwrap();
-            part_queue.push_front(op.apply(lhs, rhs));
-            // TODO: This optimization breaks this code. Why?
-            //if part_queue.front().unwrap() > &equation.value {
-            //    return false;
-            //}
-        }
-
-        if *part_queue.front().unwrap() == equation.value {
-            return true;
-        }
-    }
-
-    false
+fn is_possible(acc: u64, parts: &[u64], target: u64) -> bool {
+    (acc == target && parts.is_empty())
+        || ((acc <= target && !parts.is_empty())
+            && (is_possible(Operator::Add.apply(acc, parts[0]), &parts[1..], target)
+                || is_possible(Operator::Mul.apply(acc, parts[0]), &parts[1..], target)))
 }
 
 fn solve(parsed: &[Equation]) -> u64 {
     parsed
         .iter()
-        .filter_map(|e| if is_possible(e) { Some(e.value) } else { None })
+        .filter_map(|e| {
+            if is_possible(e.parts[0], &e.parts[1..], e.value) {
+                Some(e.value)
+            } else {
+                None
+            }
+        })
         .sum()
 }
 
