@@ -15,6 +15,7 @@ All activities are over SSH, and development happens in [Neovim](https://neovim.
 
 ## timings
 
+```
 | year | day | part | avg 20 trials (release) |
 | ---  | --- | ---  | ---                     |
 | 2024 | 01  | a    | 0.000736689567565918    |
@@ -28,11 +29,12 @@ All activities are over SSH, and development happens in [Neovim](https://neovim.
 | 2024 | 05  | a    | 0.006460726261138916    |
 | 2024 | 05  | b    | 0.02109997272491455     |
 | 2024 | 06  | a    | 0.0035663247108459473   |
-| 2024 | 06  | b    | 0.11458505392074585     |
+| 2024 | 06  | b    | 0.09860951900482177     |
 | 2024 | 07  | a    | 0.002495479583740234    |
 | 2024 | 07  | b    | 0.03600732088088989     |
 | 2024 | 08  | a    | 0.0007539629936218262   |
 | 2024 | 08  | b    | 0.001094663143157959    |
+```
 
 ## deeper profiling
 
@@ -49,8 +51,11 @@ View it: `http://<machine-name>:9000/flamegraph.svg`
 
 ## takeaways
 
-Hashing is really slow in Rust! This came up on 2024-06-b!
-
-* https://nnethercote.github.io/perf-book/hashing.html
+* Hashing is really slow in Rust! This came up on 2024-06-b!
+    * https://nnethercote.github.io/perf-book/hashing.html
+* The [itertools](https://docs.rs/itertools/latest/itertools/) crate can be
+  really slow! For 2024-07-b I had even materialized all the permutations for
+  caching. Turns out that's just a suboptimal approach to the problem
+  altogether (explicitly iterating permutations).
 
 

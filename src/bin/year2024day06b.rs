@@ -121,14 +121,16 @@ impl std::fmt::Display for Tile {
 #[derive(Debug, Clone)]
 struct Navigator {
     transitions: FxHashMap<(Point2, Direction), (Point2, Direction)>,
-    prev: FxHashMap<(Point2, Direction), (Point2, Direction)>,
+    _prev_removals: Vec<((Point2, Direction), (Point2, Direction))>,
+    _prev_additions: Vec<((Point2, Direction), (Point2, Direction))>,
 }
 
 impl Navigator {
     fn new() -> Self {
         Self {
             transitions: FxHashMap::default(),
-            prev: FxHashMap::default(),
+            _prev_removals: Vec::new(),
+            _prev_additions: Vec::new(),
         }
     }
 
@@ -180,8 +182,9 @@ impl Navigator {
 
     /// Mutate state to build all transition points from scratch.
     fn rebuild_all_transitions(&mut self, state: &State) {
-        self.prev.clear();
         self.transitions.clear();
+        self._prev_removals.clear();
+        self._prev_additions.clear();
         for p in &state.obstructions {
             for (start, end) in self.get_transitions_around(state, p) {
                 self.transitions.insert(start, end);
@@ -195,8 +198,12 @@ impl Navigator {
     /// Mutate state to recreate transition points around new this obstruction.
     fn add_obstruction(&mut self, state: &State, obstruction: &Point2) {
         // Removing an obstruction is a rewind to the previous state because I got tired of dealing
-        // with bugs in the actual logic for incremental removal and transition rebuilding.
-        self.prev = self.transitions.clone();
+        // with bugs in the actual logic for incremental removal and transition rebuilding. At
+        // least I'm not cloning the entire transitions map anymore, and can replay the inverse of
+        // whatever mutations happened during the add!
+        if !(self._prev_removals.is_empty() && self._prev_additions.is_empty()) {
+            panic!("Already have an obstruction added, remove it first.");
+        }
 
         if !state.obstructions.contains(obstruction) {
             panic!("Obstruction must already be in state!");
@@ -210,6 +217,9 @@ impl Navigator {
                 // Recreate this intersected segment.
                 to_remove.push((*start, *d_enter));
                 let new_end = self.get_end(state, start, d_exit);
+                if (start, d_enter) == (&new_end, d_exit) {
+                    continue;
+                }
                 to_add.push(((*start, *d_enter), (new_end, *d_exit)));
             }
         }
@@ -219,16 +229,30 @@ impl Navigator {
         }
 
         for update in to_remove {
-            self.transitions.remove(&update);
+            self._prev_removals
+                .push((update, *self.transitions.get(&update).unwrap()));
+            if self.transitions.remove(&update).is_none() {
+                panic!("Transition removal update did not remove any item.");
+            }
         }
-        for update in to_add {
-            self.transitions.insert(update.0, update.1);
+        for update in &to_add {
+            self._prev_additions.push(*update);
+            if self.transitions.insert(update.0, update.1).is_some() {
+                panic!("Transition addition update overwrote existing item.");
+            }
         }
     }
 
     /// Mutate state to recreate transition points without this obstruction.
     fn remove_last_obstruction(&mut self) {
-        self.transitions = self.prev.clone();
+        for (key, _) in &self._prev_additions {
+            self.transitions.remove(key);
+        }
+        for (key, value) in &self._prev_removals {
+            self.transitions.insert(*key, *value);
+        }
+        self._prev_removals.clear();
+        self._prev_additions.clear();
     }
 }
 
