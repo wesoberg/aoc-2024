@@ -98,7 +98,7 @@ fn parse_input(input: String) -> State {
     state
 }
 
-fn get_antinodes(towers: &Vec<Point2>, bbox: &BBox2) -> Vec<Point2> {
+fn get_antinodes(towers: &[Point2], bbox: &BBox2) -> Vec<Point2> {
     let mut antinodes = Vec::new();
 
     // .a.

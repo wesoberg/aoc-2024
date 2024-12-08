@@ -1,6 +1,5 @@
-use rustc_hash::FxHashSet;
-
 use aoc_2024_rs::*;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
 struct Point2 {
@@ -14,7 +13,7 @@ impl Point2 {
     }
 
     fn min() -> Self {
-        Self::new(0, 0)
+        Self::new(i32::MIN, i32::MIN)
     }
 
     fn max() -> Self {
@@ -30,12 +29,15 @@ struct BBox2 {
 
 impl BBox2 {
     #[allow(dead_code)]
-    fn new(min: Point2, max: Point2) -> Self {
-        BBox2 { min, max }
+    fn new(a: &Point2, b: &Point2) -> Self {
+        Self {
+            min: Point2::new(a.x.min(b.x), a.y.min(b.y)),
+            max: Point2::new(a.x.max(b.x), a.y.max(b.y)),
+        }
     }
 
     fn default() -> Self {
-        BBox2 {
+        Self {
             min: Point2::max(),
             max: Point2::min(),
         }
@@ -115,6 +117,121 @@ impl std::fmt::Display for Tile {
     }
 }
 
+/// Now you're thinking with portals!
+#[derive(Debug, Clone)]
+struct Navigator {
+    transitions: FxHashMap<(Point2, Direction), (Point2, Direction)>,
+    prev: FxHashMap<(Point2, Direction), (Point2, Direction)>,
+}
+
+impl Navigator {
+    fn new() -> Self {
+        Self {
+            transitions: FxHashMap::default(),
+            prev: FxHashMap::default(),
+        }
+    }
+
+    /// Walk a straight line in the given direction and return the end point, which could either be
+    /// on an edge (another step in this direction would take you out of bounds) or right before an
+    /// obstruction (another step would be blocked).
+    fn get_end(&self, state: &State, at: &Point2, d: &Direction) -> Point2 {
+        let mut end = *at;
+        loop {
+            let step = d.step(&end);
+            if !state.bbox.contains(&step) || state.obstructions.contains(&step) {
+                break;
+            }
+            end = step;
+        }
+        end
+    }
+
+    /// These are the entrances and exits of the portals.
+    /// Get the ((start, facing), (end, facing)) pairs around the given point, by walking out from
+    /// each of the point's neighbors, assuming the given point is an obstruction that would
+    /// require rotating out from. For example, if `p` is (0,0), the result could contain up to
+    /// four pairs. One pair may be:
+    /// * Traveling Noth to encounter `p` from its South, (0,-1), and walking East, (1,-1), (2,-1),
+    ///   etc., until hitting an obstruction at (5,-1), resulting in (((0,-1),N),((4,-1),E)).
+    fn get_transitions_around(
+        &self,
+        state: &State,
+        obstruction: &Point2,
+    ) -> Vec<((Point2, Direction), (Point2, Direction))> {
+        let mut transitions = Vec::new();
+        for d_edge in [
+            Direction::North,
+            Direction::East,
+            Direction::South,
+            Direction::West,
+        ] {
+            let start = d_edge.step(obstruction);
+            if !state.bbox.contains(&start) || state.obstructions.contains(&start) {
+                continue;
+            }
+            let d_enter = d_edge.rotate_right().rotate_right();
+            let d_exit = d_enter.rotate_right();
+            let end = self.get_end(state, &start, &d_exit);
+            transitions.push(((start, d_enter), (end, d_exit)));
+        }
+        transitions
+    }
+
+    /// Mutate state to build all transition points from scratch.
+    fn rebuild_all_transitions(&mut self, state: &State) {
+        self.prev.clear();
+        self.transitions.clear();
+        for p in &state.obstructions {
+            for (start, end) in self.get_transitions_around(state, p) {
+                self.transitions.insert(start, end);
+            }
+        }
+        let end = self.get_end(state, &state.guard_at, &state.guard_face);
+        self.transitions
+            .insert((state.guard_at, state.guard_face), (end, state.guard_face));
+    }
+
+    /// Mutate state to recreate transition points around new this obstruction.
+    fn add_obstruction(&mut self, state: &State, obstruction: &Point2) {
+        // Removing an obstruction is a rewind to the previous state because I got tired of dealing
+        // with bugs in the actual logic for incremental removal and transition rebuilding.
+        self.prev = self.transitions.clone();
+
+        if !state.obstructions.contains(obstruction) {
+            panic!("Obstruction must already be in state!");
+        }
+
+        let mut to_remove: Vec<(Point2, Direction)> = Vec::new();
+        let mut to_add: Vec<((Point2, Direction), (Point2, Direction))> = Vec::new();
+
+        for ((start, d_enter), (end, d_exit)) in self.transitions.iter() {
+            if BBox2::new(start, end).contains(obstruction) {
+                // Recreate this intersected segment.
+                to_remove.push((*start, *d_enter));
+                let new_end = self.get_end(state, start, d_exit);
+                to_add.push(((*start, *d_enter), (new_end, *d_exit)));
+            }
+        }
+        // Add the new segments around this obstruction.
+        for (start, end) in self.get_transitions_around(state, obstruction) {
+            to_add.push((start, end));
+        }
+
+        for update in to_remove {
+            self.transitions.remove(&update);
+        }
+        for update in to_add {
+            self.transitions.insert(update.0, update.1);
+        }
+    }
+
+    /// Mutate state to recreate transition points without this obstruction.
+    fn remove_last_obstruction(&mut self) {
+        self.transitions = self.prev.clone();
+    }
+}
+
 #[derive(Debug, Clone)]
 struct State {
     obstructions: FxHashSet<Point2>,
@@ -182,73 +299,79 @@ fn pprint_grid(state: &State) {
     }
 }
 
-fn patrol(state: &State) -> (FxHashSet<(Point2, Direction)>, bool) {
-    let mut guard_at = state.guard_at;
-    let mut guard_face = state.guard_face;
+fn patrol(state: &mut State, nav: &mut Navigator) -> (FxHashSet<(Point2, Direction)>, bool) {
+    let mut visited_jumps = FxHashSet::default();
 
-    let mut visited = FxHashSet::default();
-    visited.reserve((state.bbox.max.x * state.bbox.max.y).try_into().unwrap());
-    visited.insert((guard_at, guard_face));
-
-    loop {
-        let next_at = guard_face.step(&guard_at);
-
-        match state.get(&next_at) {
-            Some(Tile::Obstruction) => {
-                guard_face = guard_face.rotate_right();
-            }
-            Some(Tile::Open | Tile::Guard(_)) => {
-                guard_at = next_at;
-                if !visited.insert((guard_at, guard_face)) {
-                    return (visited, true);
-                }
-            }
-            None => break,
+    while let Some((at, face)) = nav.transitions.get(&(state.guard_at, state.guard_face)) {
+        if !visited_jumps.insert((state.guard_at, state.guard_face)) {
+            return (visited_jumps, true);
         }
+        state.guard_at = *at;
+        state.guard_face = *face;
     }
 
-    (visited, false)
+    (visited_jumps, false)
 }
 
-// TODO: Could probably use "vectors" instead of individual steps?
-// Or maybe pre-compute jumps?
-//
-// TODO: Hashing is still the slowest part, even after switching to one of the supposedly fastest
-// hashing algorithm crates out there. May want to try Vec<Vec<bool>> and equivalents, just to see
-// how it performs in comparison. Maybe Vec<bool> (flattened with access formula) would be even
-// better than that? Maybe even bitwise masks even better (can you do an arbitrary series of bytes
-// in Rust? well there's probably a crate)? Could potentially do bytes and have enum flags in there
-// for directions and such?
+fn get_looping_obstructions(state: &mut State, nav: &mut Navigator) -> FxHashSet<Point2> {
+    let start_at = state.guard_at;
+    let start_face = state.guard_face;
 
-fn get_looping_obstacles(state: &State) -> FxHashSet<Point2> {
-    let mut current = state.clone();
-    let (visited, _) = patrol(state);
+    let (visited_jumps, _) = patrol(state, nav);
+    let mut visited_tiles = FxHashSet::default();
+    for (start, d_enter) in visited_jumps {
+        let (end, _) = nav.transitions.get(&(start, d_enter)).unwrap();
+        let bbox = BBox2::new(&start, end);
+        for x in bbox.min.x..=bbox.max.x {
+            for y in bbox.min.y..=bbox.max.y {
+                visited_tiles.insert(Point2::new(x, y));
+            }
+        }
+    }
+    let mut visited_tiles: Vec<Point2> = visited_tiles.into_iter().collect();
+    visited_tiles.sort_by_key(|p| (p.x, p.y));
 
-    let mut looping_obstacles = FxHashSet::default();
+    let mut looping_obstructions = FxHashSet::default();
 
-    for (p, _) in visited {
-        if p == state.guard_at {
+    for p in visited_tiles {
+        // Never put the obstruction on the original starting position!
+        if p == start_at {
             continue;
         }
-        current.obstructions.insert(p);
-        let (_, looped) = patrol(&current);
-        current.obstructions.remove(&p);
+
+        state.guard_at = start_at;
+        state.guard_face = start_face;
+
+        state.obstructions.insert(p);
+        nav.add_obstruction(state, &p);
+
+        let (_, looped) = patrol(state, nav);
+
+        state.guard_at = start_at;
+        state.guard_face = start_face;
+
+        state.obstructions.remove(&p);
+        nav.remove_last_obstruction();
+
         if looped {
-            looping_obstacles.insert(p);
+            looping_obstructions.insert(p);
         }
     }
 
-    looping_obstacles
+    looping_obstructions
 }
 
-fn solve(parsed: &State) -> usize {
-    get_looping_obstacles(parsed).len()
+fn solve(parsed: &mut State) -> usize {
+    let mut nav = Navigator::new();
+    nav.rebuild_all_transitions(parsed);
+    get_looping_obstructions(parsed, &mut nav).len()
 }
 
 fn main() {
     let input = load_input(2024, 6);
-    let parsed = parse_input(input);
-    let answer = solve(&parsed);
+
+    let mut parsed = parse_input(input);
+    let answer = solve(&mut parsed);
     println!("Answer: {:?}", answer);
 }
 
@@ -288,7 +411,7 @@ mod tests {
         assert_eq!(Direction::North, parsed.guard_face);
 
         assert_eq!(
-            BBox2::new(Point2::new(0, 0), Point2::new(9, 9)),
+            BBox2::new(&Point2::new(0, 0), &Point2::new(9, 9)),
             parsed.bbox
         );
 
@@ -303,11 +426,15 @@ mod tests {
         .iter()
         .cloned()
         .collect::<FxHashSet<Point2>>();
-        let actual_loops = get_looping_obstacles(&parsed);
+        let mut state = parsed.clone();
+        let mut nav = Navigator::new();
+        nav.rebuild_all_transitions(&state);
+        let actual_loops = get_looping_obstructions(&mut state, &mut nav);
         assert_eq!(expected_loops.len(), actual_loops.len());
         assert_eq!(expected_loops, actual_loops);
 
-        assert_eq!(6, solve(&parsed));
+        let mut state = parsed.clone();
+        assert_eq!(6, solve(&mut state));
 
         assert_eq!(Point2::new(4, 6), parsed.guard_at);
         assert_eq!(Direction::North, parsed.guard_face);

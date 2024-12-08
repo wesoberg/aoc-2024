@@ -71,9 +71,10 @@ fn is_possible(equation: &Equation) -> bool {
             let rhs = part_queue.pop_front().unwrap();
             let op = op_queue.pop_front().unwrap();
             part_queue.push_front(op.apply(lhs, rhs));
-            if part_queue.front().unwrap() > &equation.value {
-                return false;
-            }
+            // TODO: This optimization breaks this code. Why?
+            //if part_queue.front().unwrap() > &equation.value {
+            //    return false;
+            //}
         }
 
         if *part_queue.front().unwrap() == equation.value {

@@ -98,7 +98,7 @@ fn parse_input(input: String) -> State {
     state
 }
 
-fn get_antinodes(towers: &Vec<Point2>, bbox: &BBox2) -> Vec<Point2> {
+fn get_antinodes(towers: &[Point2], bbox: &BBox2) -> Vec<Point2> {
     let mut antinodes = Vec::new();
 
     // .a.
@@ -225,7 +225,7 @@ mod tests {
             parsed.towers.get(&'a').unwrap()
         );
 
-        let antinodes = get_antinodes(&parsed.towers.get(&'a').unwrap(), &parsed.bbox);
+        let antinodes = get_antinodes(parsed.towers.get(&'a').unwrap(), &parsed.bbox);
         assert_eq!(
             vec![
                 Point2::new(0, 2),
