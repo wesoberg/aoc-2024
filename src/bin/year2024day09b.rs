@@ -10,6 +10,13 @@ impl Block {
     fn is_file(&self) -> bool {
         matches!(self, Self::File(_, _))
     }
+
+    fn get_id(&self) -> Option<u64> {
+        match self {
+            Self::File(id, _) => Some(*id),
+            _ => None,
+        }
+    }
 }
 
 fn parse_input(input: String) -> Vec<Block> {
@@ -35,9 +42,8 @@ fn parse_input(input: String) -> Vec<Block> {
         .collect()
 }
 
+/// 12345 -> 0..111....22222
 fn get_expanded(blocks: &[Block]) -> Vec<Block> {
-    // 12345 -> 0..111....22222
-
     blocks
         .iter()
         .flat_map(|b| match b {
@@ -59,22 +65,72 @@ fn get_repr(blocks: &[Block]) -> String {
 }
 
 fn get_compacted(blocks: &[Block]) -> Vec<Block> {
+    // Gather the ranges of files and free space. At first I tried a bunch of "pointer chasing" but
+    // it was difficult to debug.
+    let mut file_ranges = Vec::new();
+    let mut free_ranges = Vec::new();
+    let mut i = 0;
+    while i < blocks.len() {
+        let j;
+        if blocks[i].is_file() {
+            j = (i..blocks.len())
+                .take_while(|&j| blocks[j].is_file() && blocks[i].get_id() == blocks[j].get_id())
+                .last()
+                .unwrap();
+            file_ranges.push((i, j));
+        } else {
+            j = (i..blocks.len())
+                .take_while(|&j| !blocks[j].is_file())
+                .last()
+                .unwrap();
+            free_ranges.push(Some((i, j)));
+        }
+        i = j + 1;
+    }
+
     let mut compacted = blocks.to_owned();
 
-    let mut i = 0;
-    let mut j = compacted.len() - 1;
-
+    // Walk over the file ranges once in reverse.
+    let mut file_range_index = file_ranges.len() - 1;
     loop {
-        while compacted[i].is_file() {
-            i += 1;
+        let (file_start, file_end) = file_ranges[file_range_index];
+        let file_size = file_end - file_start + 1;
+
+        // Walk over the free space ranges forwards until either one free space is found that fits
+        // the current file (has a fit), or the free space occurs after the file (no fits).
+        let mut free_range_index = 0;
+        while free_range_index < free_ranges.len() {
+            if let Some((free_start, free_end)) = free_ranges[free_range_index] {
+                if free_start >= file_end {
+                    // This was the last bug, visible by the "12345" example, where files were
+                    // moving to the right!
+                    break;
+                }
+
+                let free_size = free_end - free_start + 1;
+                if free_size < file_size {
+                    free_range_index += 1;
+                    continue;
+                }
+
+                for offset in 0..file_size {
+                    compacted.swap(free_start + offset, file_start + offset);
+                }
+                if free_size == file_size {
+                    free_ranges[free_range_index] = None;
+                } else {
+                    free_ranges[free_range_index] = Some((free_start + file_size, free_end));
+                }
+
+                break;
+            }
+            free_range_index += 1;
         }
-        while !compacted[j].is_file() {
-            j -= 1;
-        }
-        if i >= j {
+
+        file_range_index -= 1;
+        if file_range_index == 0 {
             break;
         }
-        compacted.swap(i, j);
     }
 
     compacted
@@ -85,14 +141,12 @@ fn solve(parsed: Vec<Block>) -> u64 {
     for (i, b) in get_compacted(&get_expanded(&parsed)).iter().enumerate() {
         if let Block::File(id, _) = b {
             let lhs: u64 = i.try_into().unwrap();
-            accumulator += lhs * *id;
+            let rhs: u64 = *id;
+            accumulator += lhs * rhs;
         }
     }
     accumulator
 }
-
-// Got answer too low first time using i32, swapped to u64, it worked. Shouldn't some unwrap() call
-// have panicked though? Maybe because I only ran in release, and release skips those checks?
 
 fn main() {
     let input = load_input(2024, 9);
@@ -106,7 +160,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn day09a_example1() {
+    fn day09b_example1() {
         let input = "
 12345
         "
@@ -148,11 +202,11 @@ mod tests {
         );
         assert_eq!("0..111....22222", get_repr(&expanded));
 
-        assert_eq!("022111222......", get_repr(&get_compacted(&expanded)));
+        assert_eq!("0..111....22222", get_repr(&get_compacted(&expanded)));
     }
 
     #[test]
-    fn day09a_example2() {
+    fn day09b_example2() {
         let input = "
 2333133121414131402
             "
@@ -167,10 +221,10 @@ mod tests {
         );
 
         assert_eq!(
-            "0099811188827773336446555566..............",
+            "00992111777.44.333....5555.6666.....8888..",
             get_repr(&get_compacted(&expanded))
         );
 
-        assert_eq!(1928, solve(parsed));
+        assert_eq!(2858, solve(parsed));
     }
 }
