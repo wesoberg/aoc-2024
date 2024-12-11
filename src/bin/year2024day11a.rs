@@ -2,7 +2,6 @@ use aoc_2024_rs::*;
 
 fn parse_input(input: String) -> Vec<u64> {
     input
-        .trim()
         .split_whitespace()
         .map(|chunk| chunk.parse().unwrap())
         .collect()
@@ -24,10 +23,10 @@ fn count_stones(stone: u64, depth: u64) -> u64 {
         return count_stones(lhs, depth - 1) + count_stones(rhs, depth - 1);
     }
 
-    return count_stones(stone * 2024, depth - 1);
+    count_stones(stone * 2024, depth - 1)
 }
 
-fn solve(parsed: &Vec<u64>, depth: u64) -> u64 {
+fn solve(parsed: &[u64], depth: u64) -> u64 {
     parsed.iter().map(|&p| count_stones(p, depth)).sum()
 }
 
