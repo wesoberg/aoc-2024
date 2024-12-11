@@ -65,10 +65,14 @@ fn get_repr(blocks: &[Block]) -> String {
 }
 
 fn get_compacted(blocks: &[Block]) -> Vec<Block> {
-    // Gather the ranges of files and free space. At first I tried a bunch of "pointer chasing" but
-    // it was difficult to debug.
+    // First build a list for file ranges, and another list for free ranges bucketed by the block
+    // size. The idea is to use the file size to index into these free ranges buckets. Instead of
+    // walking the entire free ranges list every single file block iteration, we can instead walk a
+    // few buckets and check the last element in each bucket to see if indices are good. The free
+    // ranges bucket lists will need to be maintained sorted in reverse order, so that last() is
+    // always applicable.
+    let mut free_buckets = Vec::new();
     let mut file_ranges = Vec::new();
-    let mut free_ranges = Vec::new();
     let mut i = 0;
     while i < blocks.len() {
         let j;
@@ -83,53 +87,63 @@ fn get_compacted(blocks: &[Block]) -> Vec<Block> {
                 .take_while(|&j| !blocks[j].is_file())
                 .last()
                 .unwrap();
-            free_ranges.push(Some((i, j)));
+            let s = j - i + 1;
+            while s >= free_buckets.len() {
+                free_buckets.push(Vec::new());
+            }
+            free_buckets[s].push((i, j));
         }
         i = j + 1;
+    }
+
+    for bucket in &mut free_buckets {
+        bucket.sort();
+        bucket.reverse();
     }
 
     let mut compacted = blocks.to_owned();
 
     // Walk over the file ranges once in reverse.
-    let mut file_range_index = file_ranges.len() - 1;
-    loop {
-        let (file_start, file_end) = file_ranges[file_range_index];
+    for (file_start, file_end) in file_ranges.iter().rev() {
         let file_size = file_end - file_start + 1;
-
-        // Walk over the free space ranges forwards until either one free space is found that fits
-        // the current file (has a fit), or the free space occurs after the file (no fits).
-        let mut free_range_index = 0;
-        while free_range_index < free_ranges.len() {
-            if let Some((free_start, free_end)) = free_ranges[free_range_index] {
-                if free_start >= file_end {
-                    // This was the last bug, visible by the "12345" example, where files were
-                    // moving to the right!
-                    break;
-                }
-
-                let free_size = free_end - free_start + 1;
-                if free_size < file_size {
-                    free_range_index += 1;
-                    continue;
-                }
-
-                for offset in 0..file_size {
-                    compacted.swap(free_start + offset, file_start + offset);
-                }
-                if free_size == file_size {
-                    free_ranges[free_range_index] = None;
-                } else {
-                    free_ranges[free_range_index] = Some((free_start + file_size, free_end));
-                }
-
-                break;
-            }
-            free_range_index += 1;
+        if file_size >= free_buckets.len() || free_buckets[file_size].is_empty() {
+            continue;
         }
 
-        file_range_index -= 1;
-        if file_range_index == 0 {
-            break;
+        // Walk the free ranges buckets that could fit this file. Look for the lowest index free
+        // block in all of those potential buckets.
+        let mut best_bucket_index = usize::MAX;
+        let mut smallest_index_seen = usize::MAX;
+        for (bucket_index, bucket) in free_buckets.iter().enumerate().skip(file_size) {
+            if let Some((free_start, _)) = bucket.last() {
+                if free_start >= file_start {
+                    continue;
+                }
+                if *free_start < smallest_index_seen {
+                    best_bucket_index = bucket_index;
+                    smallest_index_seen = *free_start;
+                }
+            }
+        }
+        if best_bucket_index == usize::MAX {
+            continue;
+        }
+
+        let (free_start, free_end) = free_buckets[best_bucket_index].pop().unwrap();
+        let free_size = free_end - free_start + 1;
+
+        for offset in 0..file_size {
+            compacted.swap(free_start + offset, file_start + offset);
+        }
+
+        // If there's leftover free space, re-allocate this remaining free space to the appropriate
+        // free ranges bucket.
+        if free_size > file_size {
+            let new_free_start = free_start + file_size;
+            let new_free_size = free_end - new_free_start + 1;
+            free_buckets[new_free_size].push((new_free_start, free_end));
+            free_buckets[new_free_size].sort();
+            free_buckets[new_free_size].reverse();
         }
     }
 
