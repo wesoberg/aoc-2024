@@ -110,10 +110,10 @@ fn parse_input(input: String) -> State {
 
 fn get_neighbors(at: &Point2) -> Vec<Point2> {
     vec![
-        Direction::North.step(&at),
-        Direction::East.step(&at),
-        Direction::South.step(&at),
-        Direction::West.step(&at),
+        Direction::North.step(at),
+        Direction::East.step(at),
+        Direction::South.step(at),
+        Direction::West.step(at),
     ]
 }
 
@@ -121,14 +121,14 @@ fn get_bounded_neighbors(bbox: &BBox2, at: &Point2) -> Vec<Point2> {
     get_neighbors(at)
         .iter()
         .filter(|n| bbox.contains(n))
-        .map(|n| *n)
+        .copied()
         .collect()
 }
 
 fn flood_fill(state: &State, start: &Point2) -> Vec<Point2> {
     let mut region = Vec::new();
 
-    let color = state.grid.get(&start).unwrap();
+    let color = state.grid.get(start).unwrap();
     let mut queue = VecDeque::new();
     queue.push_back(*start);
     while let Some(n) = queue.pop_front() {
@@ -243,7 +243,7 @@ fn solve(parsed: &State) -> usize {
     get_regions(parsed)
         .iter()
         .map(|region| {
-            let (area, perimeter) = get_dimensions(&region);
+            let (area, perimeter) = get_dimensions(region);
             area * perimeter
         })
         .sum()

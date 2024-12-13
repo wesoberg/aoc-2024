@@ -188,4 +188,3 @@ Prize: X=18641, Y=10279
         assert!(solve_system(&parsed[3]).is_some());
     }
 }
-
