@@ -108,19 +108,21 @@ fn parse_input(input: String) -> State {
     state
 }
 
-fn get_neighbors(bbox: &BBox2, at: &Point2) -> Vec<Point2> {
-    let mut neighbors = Vec::new();
-    for step in [
+fn get_neighbors(at: &Point2) -> Vec<Point2> {
+    vec![
         Direction::North.step(&at),
         Direction::East.step(&at),
         Direction::South.step(&at),
         Direction::West.step(&at),
-    ] {
-        if bbox.contains(&step) {
-            neighbors.push(step);
-        }
-    }
-    neighbors
+    ]
+}
+
+fn get_bounded_neighbors(bbox: &BBox2, at: &Point2) -> Vec<Point2> {
+    get_neighbors(at)
+        .iter()
+        .filter(|n| bbox.contains(n))
+        .map(|n| *n)
+        .collect()
 }
 
 fn flood_fill(state: &State, start: &Point2) -> Vec<Point2> {
@@ -135,7 +137,7 @@ fn flood_fill(state: &State, start: &Point2) -> Vec<Point2> {
         }
         if state.grid.get(&n).unwrap() == color {
             region.push(n);
-            for neighbor in get_neighbors(&state.bbox, &n) {
+            for neighbor in get_bounded_neighbors(&state.bbox, &n) {
                 queue.push_back(neighbor);
             }
         }
@@ -160,15 +162,78 @@ fn get_regions(state: &State) -> Vec<Vec<Point2>> {
     regions
 }
 
-fn get_dimensions(bbox: &BBox2, region: &Vec<Point2>) -> (usize, usize) {
-    let mut perimeter = 0;
+fn get_dimensions(region: &Vec<Point2>) -> (usize, usize) {
+    // Count all continuous segments along boundaries between this region and its non-this-region
+    // neighbors in all four directions. For each Y row, check each X column's north and south
+    // boundary. For each X column, check each Y row's east and west boundary. If a step from the
+    // point in the region would be outside the region, record that coordinate and that direction.
+    // The count of continuous series of X (for each invariant Y) (and vise versa) is the desired
+    // perimeter.
+    //
+    // I have to assume there's a much more elegant way to implement this.
 
+    let mut edges_x: HashMap<i32, HashMap<Direction, Vec<i32>>> = HashMap::new();
+    let mut edges_y: HashMap<i32, HashMap<Direction, Vec<i32>>> = HashMap::new();
     for point in region {
-        let neighbors = get_neighbors(bbox, point)
-            .iter()
-            .filter(|&n| region.contains(n))
-            .count();
-        perimeter += 4 - neighbors;
+        for direction in [Direction::North, Direction::South] {
+            if region.contains(&direction.step(point)) {
+                continue;
+            }
+            edges_y
+                .entry(point.y)
+                .and_modify(|ds| {
+                    ds.entry(direction)
+                        .and_modify(|ps| {
+                            ps.push(point.x);
+                            ps.sort();
+                        })
+                        .or_insert(vec![point.x]);
+                })
+                .or_insert(HashMap::from([(direction, vec![point.x])]));
+        }
+
+        for direction in [Direction::East, Direction::West] {
+            if region.contains(&direction.step(point)) {
+                continue;
+            }
+            edges_x
+                .entry(point.x)
+                .and_modify(|ds| {
+                    ds.entry(direction)
+                        .and_modify(|ps| {
+                            ps.push(point.y);
+                            ps.sort();
+                        })
+                        .or_insert(vec![point.y]);
+                })
+                .or_insert(HashMap::from([(direction, vec![point.y])]));
+        }
+    }
+
+    let mut perimeter = 0;
+    for (_y, ds) in edges_x {
+        for (_d, ys) in ds {
+            perimeter += 1;
+            if ys.len() > 1 {
+                for i in 1..ys.len() {
+                    if ys[i] - ys[i - 1] > 1 {
+                        perimeter += 1;
+                    }
+                }
+            }
+        }
+    }
+    for (_x, ds) in edges_y {
+        for (_d, xs) in ds {
+            perimeter += 1;
+            if xs.len() > 1 {
+                for i in 1..xs.len() {
+                    if xs[i] - xs[i - 1] > 1 {
+                        perimeter += 1;
+                    }
+                }
+            }
+        }
     }
 
     (region.len(), perimeter)
@@ -178,7 +243,7 @@ fn solve(parsed: &State) -> usize {
     get_regions(parsed)
         .iter()
         .map(|region| {
-            let (area, perimeter) = get_dimensions(&parsed.bbox, &region);
+            let (area, perimeter) = get_dimensions(&region);
             area * perimeter
         })
         .sum()
@@ -196,7 +261,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn day12a_example1() {
+    fn day12b_example1() {
         let input = "
 AAAA
 BBCD
@@ -240,49 +305,82 @@ EEEC
         let regions = get_regions(&parsed);
         assert_eq!(5, regions.len());
 
-        assert_eq!((4, 10), get_dimensions(&parsed.bbox, &region_a));
-        assert_eq!((4, 8), get_dimensions(&parsed.bbox, &region_b));
-        assert_eq!((4, 10), get_dimensions(&parsed.bbox, &region_c));
-        assert_eq!((1, 4), get_dimensions(&parsed.bbox, &region_d));
-        assert_eq!((3, 8), get_dimensions(&parsed.bbox, &region_e));
+        assert_eq!((4, 4), get_dimensions(&region_a));
+        assert_eq!((4, 4), get_dimensions(&region_b));
+        assert_eq!((4, 8), get_dimensions(&region_c));
+        assert_eq!((1, 4), get_dimensions(&region_d));
+        assert_eq!((3, 4), get_dimensions(&region_e));
 
-        assert_eq!(140, solve(&parsed));
+        assert_eq!(80, solve(&parsed));
     }
 
     #[test]
-    fn day12a_example2() {
+    fn day12b_example2() {
         let input = "
-OOOOO
-OXOXO
-OOOOO
-OXOXO
-OOOOO
+    OOOOO
+    OXOXO
+    OOOOO
+    OXOXO
+    OOOOO
         "
         .trim()
         .to_string();
         let parsed = parse_input(input);
 
-        assert_eq!(772, solve(&parsed));
+        assert_eq!(436, solve(&parsed));
     }
 
     #[test]
-    fn day12a_example3() {
+    fn day12b_example3() {
         let input = "
-RRRRIICCFF
-RRRRIICCCF
-VVRRRCCFFF
-VVRCCCJFFF
-VVVVCJJCFE
-VVIVCCJJEE
-VVIIICJJEE
-MIIIIIJJEE
-MIIISIJEEE
-MMMISSJEEE
+    EEEEE
+    EXXXX
+    EEEEE
+    EXXXX
+    EEEEE
         "
         .trim()
         .to_string();
         let parsed = parse_input(input);
 
-        assert_eq!(1930, solve(&parsed));
+        assert_eq!(236, solve(&parsed));
+    }
+
+    #[test]
+    fn day12b_example4() {
+        let input = "
+    AAAAAA
+    AAABBA
+    AAABBA
+    ABBAAA
+    ABBAAA
+    AAAAAA
+        "
+        .trim()
+        .to_string();
+        let parsed = parse_input(input);
+
+        assert_eq!(368, solve(&parsed));
+    }
+
+    #[test]
+    fn day12b_example5() {
+        let input = "
+    RRRRIICCFF
+    RRRRIICCCF
+    VVRRRCCFFF
+    VVRCCCJFFF
+    VVVVCJJCFE
+    VVIVCCJJEE
+    VVIIICJJEE
+    MIIIIIJJEE
+    MIIISIJEEE
+    MMMISSJEEE
+        "
+        .trim()
+        .to_string();
+        let parsed = parse_input(input);
+
+        assert_eq!(1206, solve(&parsed));
     }
 }

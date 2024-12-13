@@ -16,8 +16,8 @@ fn count_stones(stones: &[u64], depth: u64) -> u64 {
         }
 
         let key = (stone, depth);
-        if cache.contains_key(&key) {
-            return *cache.get(&key).unwrap();
+        if let Some(value) = cache.get(&key) {
+            return *value;
         }
 
         if stone == 0 {

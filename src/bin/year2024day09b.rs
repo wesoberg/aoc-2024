@@ -106,7 +106,12 @@ fn get_compacted(blocks: &[Block]) -> Vec<Block> {
     // Walk over the file ranges once in reverse.
     for (file_start, file_end) in file_ranges.iter().rev() {
         let file_size = file_end - file_start + 1;
-        if file_size >= free_buckets.len() || free_buckets[file_size].is_empty() {
+
+        // Interestingly, adding this (obviously logically incorrect, given the loop below) check
+        // here makes the tests fail but still gives the same correct answer on the input:
+        // || free_buckets[file_size].is_empty()
+        // That's so wild!
+        if file_size >= free_buckets.len() {
             continue;
         }
 
