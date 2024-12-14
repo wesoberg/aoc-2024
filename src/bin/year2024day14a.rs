@@ -271,4 +271,3 @@ p=2,4 v=2,-3
         assert_eq!(vec![(Point2::new(1, 3), Point2::new(2, -3))], state.grid);
     }
 }
-

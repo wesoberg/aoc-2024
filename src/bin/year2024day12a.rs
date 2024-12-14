@@ -1,6 +1,5 @@
-use std::collections::{HashMap, VecDeque};
-
 use aoc_2024_rs::*;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
 struct Point2 {
@@ -76,14 +75,14 @@ impl Direction {
 }
 
 struct State {
-    grid: HashMap<Point2, char>,
+    grid: FxHashMap<Point2, char>,
     bbox: BBox2,
 }
 
 impl State {
     fn new() -> Self {
         Self {
-            grid: HashMap::new(),
+            grid: FxHashMap::default(),
             bbox: BBox2::default(),
         }
     }
@@ -123,20 +122,20 @@ fn get_neighbors(bbox: &BBox2, at: &Point2) -> Vec<Point2> {
     neighbors
 }
 
-fn flood_fill(state: &State, start: &Point2) -> Vec<Point2> {
-    let mut region = Vec::new();
+fn flood_fill(state: &State, start: &Point2) -> FxHashSet<Point2> {
+    let mut region = FxHashSet::default();
 
     let color = state.grid.get(start).unwrap();
-    let mut queue = VecDeque::new();
-    queue.push_back(*start);
-    while let Some(n) = queue.pop_front() {
+    let mut queue = Vec::new();
+    queue.push(*start);
+    while let Some(n) = queue.pop() {
         if region.contains(&n) {
             continue;
         }
         if state.grid.get(&n).unwrap() == color {
-            region.push(n);
+            region.insert(n);
             for neighbor in get_neighbors(&state.bbox, &n) {
-                queue.push_back(neighbor);
+                queue.push(neighbor);
             }
         }
     }
@@ -144,8 +143,8 @@ fn flood_fill(state: &State, start: &Point2) -> Vec<Point2> {
     region
 }
 
-fn get_regions(state: &State) -> Vec<Vec<Point2>> {
-    let mut regions: Vec<Vec<Point2>> = Vec::new();
+fn get_regions(state: &State) -> Vec<FxHashSet<Point2>> {
+    let mut regions: Vec<FxHashSet<Point2>> = Vec::new();
 
     for y in state.bbox.min.y..=state.bbox.max.y {
         for x in state.bbox.min.x..=state.bbox.max.x {
@@ -160,7 +159,7 @@ fn get_regions(state: &State) -> Vec<Vec<Point2>> {
     regions
 }
 
-fn get_dimensions(bbox: &BBox2, region: &Vec<Point2>) -> (usize, usize) {
+fn get_dimensions(bbox: &BBox2, region: &FxHashSet<Point2>) -> (usize, usize) {
     let mut perimeter = 0;
 
     for point in region {
@@ -207,34 +206,45 @@ EEEC
         .to_string();
         let parsed = parse_input(input);
 
-        let region_a = vec![
-            Point2::new(0, 0),
-            Point2::new(1, 0),
-            Point2::new(2, 0),
-            Point2::new(3, 0),
-        ];
+        let region_a = FxHashSet::from_iter(
+            [
+                Point2::new(0, 0),
+                Point2::new(1, 0),
+                Point2::new(2, 0),
+                Point2::new(3, 0),
+            ]
+            .into_iter(),
+        );
         assert_eq!(region_a, flood_fill(&parsed, &Point2::new(0, 0)));
 
-        let region_b = vec![
-            Point2::new(0, 1),
-            Point2::new(1, 1),
-            Point2::new(0, 2),
-            Point2::new(1, 2),
-        ];
+        let region_b = FxHashSet::from_iter(
+            [
+                Point2::new(0, 1),
+                Point2::new(1, 1),
+                Point2::new(0, 2),
+                Point2::new(1, 2),
+            ]
+            .into_iter(),
+        );
         assert_eq!(region_b, flood_fill(&parsed, &Point2::new(0, 1)));
 
-        let region_c = vec![
-            Point2::new(2, 1),
-            Point2::new(2, 2),
-            Point2::new(3, 2),
-            Point2::new(3, 3),
-        ];
+        let region_c = FxHashSet::from_iter(
+            [
+                Point2::new(2, 1),
+                Point2::new(2, 2),
+                Point2::new(3, 2),
+                Point2::new(3, 3),
+            ]
+            .into_iter(),
+        );
         assert_eq!(region_c, flood_fill(&parsed, &Point2::new(2, 1)));
 
-        let region_d = vec![Point2::new(3, 1)];
+        let region_d = FxHashSet::from_iter([Point2::new(3, 1)].into_iter());
         assert_eq!(region_d, flood_fill(&parsed, &Point2::new(3, 1)));
 
-        let region_e = vec![Point2::new(0, 3), Point2::new(1, 3), Point2::new(2, 3)];
+        let region_e = FxHashSet::from_iter(
+            [Point2::new(0, 3), Point2::new(1, 3), Point2::new(2, 3)].into_iter(),
+        );
         assert_eq!(region_e, flood_fill(&parsed, &Point2::new(0, 3)));
 
         let regions = get_regions(&parsed);
