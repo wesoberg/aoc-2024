@@ -45,7 +45,7 @@ All activities are over SSH, and development happens in [Neovim](https://neovim.
 | 2024 | 13  | a    | 0.0021719932556152344   |
 | 2024 | 13  | b    | 0.002286362648010254    |
 | 2024 | 14  | a    | 0.0021587371826171874   |
-| 2024 | 14  | b    | 0.33832024335861205     |
+| 2024 | 14  | b    | 0.07314798831939698     |
 ```
 
 ## deeper profiling

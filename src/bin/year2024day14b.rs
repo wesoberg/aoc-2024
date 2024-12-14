@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use aoc_2024_rs::*;
 use regex::Regex;
@@ -53,6 +53,7 @@ impl BBox2 {
         self.max.y = self.max.y.max(p.y);
     }
 
+    #[allow(dead_code)]
     fn contains(&self, p: &Point2) -> bool {
         p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
     }
@@ -146,56 +147,41 @@ fn tick(state: &State) -> State {
     next
 }
 
-fn flood_fill_count(state: &State, start: &Point2) -> usize {
-    let get_neighbors = |p: &Point2| -> Vec<Point2> {
-        vec![
-            Point2::new(p.x, p.y - 1),
-            Point2::new(p.x + 1, p.y),
-            Point2::new(p.x, p.y + 1),
-            Point2::new(p.x - 1, p.y),
-        ]
-    };
+fn longest_continuous_column(state: &State, x: i32) -> usize {
+    let mut ys: Vec<i32> = state
+        .grid
+        .iter()
+        .filter_map(|(p, _)| if p.x == x { Some(p.y) } else { None })
+        .collect();
+    ys.sort();
 
-    let mut grid: HashMap<Point2, usize> =
-        HashMap::with_capacity((state.bbox.max.x * state.bbox.max.y).try_into().unwrap());
-    for (p, _) in &state.grid {
-        grid.entry(*p).and_modify(|c| *c += 1).or_insert(1);
-    }
-
-    let mut accumulator = 0;
-
-    let mut visited = HashSet::new();
-    let mut queue = vec![*start];
-    while let Some(at) = queue.pop() {
-        if !state.bbox.contains(&at) {
-            continue;
-        }
-        if visited.contains(&at) {
-            continue;
-        }
-        visited.insert(at);
-        if let Some(c) = grid.get(&at) {
-            accumulator += c;
-            for n in get_neighbors(&at) {
-                queue.push(n);
+    let mut longest = 0;
+    let mut candidate = 0;
+    for i in 1..ys.len() {
+        if ys[i - 1] + 1 == ys[1] {
+            candidate += 1;
+            if candidate > longest {
+                longest = candidate;
             }
+        } else {
+            candidate = 0;
         }
     }
 
-    accumulator
+    longest
 }
 
 fn solve(parsed: &State) -> usize {
     // Stepping through 4000 something rounds, there do appear to be some patterns. First, it looks
-    // like there's a border that is consistently at the same x positions (35 and 65). The pattern
-    // flips diagonally every so often, stretching along y, then along x, etc. After seeing the
-    // easter egg materialize, it is centered enough to try to do a flood fill to be sure it is
-    // found again. It may be quicker to only look for that continuous border though.
+    // like there's a border that is consistently at the same x positions (35 and 65) when the
+    // image is vertical. The pattern flips diagonally every so often, stretching along y, then
+    // along x, etc. After seeing the easter egg materialize, it is centered enough to try to do a
+    // flood fill to be sure it is found again. Did that, but looking for the longest continuous
+    // group along a given known x is much faster.
     //
     // I tried using a HashMap<Point2, Vec<Point2>> but cloning the Vec of tuples is just so much
     // faster. Setting a capacity whenever HashMap is used always helps...
 
-    let center = Point2::new(parsed.bbox.max.x / 2, parsed.bbox.max.y / 2);
     let mut step_seen = 0;
     let mut most_seen = 0;
 
@@ -203,7 +189,7 @@ fn solve(parsed: &State) -> usize {
     for step in 1.. {
         state = tick(&state);
 
-        let this_count = flood_fill_count(&state, &center);
+        let this_count = longest_continuous_column(&state, 65);
         if this_count > most_seen {
             step_seen = step;
             most_seen = this_count;
