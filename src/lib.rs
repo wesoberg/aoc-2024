@@ -9,3 +9,11 @@ pub fn load_input(year: u16, day: u8) -> String {
         )
     })
 }
+
+pub fn pause() {
+    println!("Paused...");
+    let mut buf = String::new();
+    std::io::stdin()
+        .read_line(&mut buf)
+        .expect("Read line failed!");
+}
