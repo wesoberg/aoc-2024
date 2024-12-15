@@ -23,6 +23,7 @@ impl Point2 {
         Self::new(i32::MAX, i32::MAX)
     }
 
+    #[allow(dead_code)]
     fn manhattan_distance(&self, other: &Point2) -> i32 {
         (self.x - other.x).abs() + (self.y - other.y).abs()
     }
@@ -82,7 +83,7 @@ impl Direction {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum Tile {
     Open,
     Wall,
@@ -126,22 +127,26 @@ fn parse_input(input: String) -> State {
         if line_chars.is_subset(&grid_chars) {
             for ch in line.chars() {
                 let p = Point2::new(x, y);
+                let mut wide = true;
                 if let Some(t) = match ch {
                     '#' => Some(Tile::Wall),
                     '.' => Some(Tile::Open),
-                    'O' => Some(Tile::Box),
+                    'O' => {
+                        wide = false;
+                        Some(Tile::Box)
+                    }
                     '@' => {
+                        wide = false;
                         state.bot = p;
-                        // Amazing. Took so long to debug why one box refused to move. It was never
-                        // in the grid, and I'm materializing the grid, so an empty cell only means
-                        // out of bounds. Lost at least an hour to this.
-
-                        // None
                         Some(Tile::Open)
                     }
                     _ => panic!("Unknown grid char: {:?}", ch),
                 } {
                     state.grid.insert(p, t);
+                    x += 1;
+                    state
+                        .grid
+                        .insert(Point2::new(x, y), if wide { t } else { Tile::Open });
                 }
                 state.bbox.update(&p);
                 x += 1;
@@ -167,6 +172,14 @@ fn parse_input(input: String) -> State {
     state
 }
 
+fn is_left_box(state: &State, p: &Point2) -> bool {
+    state.grid.get(p) == Some(&Tile::Box)
+}
+
+fn is_right_box(state: &State, p: &Point2) -> bool {
+    state.grid.get(p) == Some(&Tile::Open) && is_left_box(state, &Direction::West.step(p))
+}
+
 #[allow(dead_code)]
 fn pprint_grid(state: &State) {
     for y in state.bbox.min.y..=state.bbox.max.y {
@@ -176,9 +189,16 @@ fn pprint_grid(state: &State) {
                 '@'
             } else {
                 match state.grid.get(&p) {
-                    Some(Tile::Open) | None => '.',
+                    Some(Tile::Open) => {
+                        if is_right_box(state, &p) {
+                            ']'
+                        } else {
+                            '.'
+                        }
+                    }
                     Some(Tile::Wall) => '#',
-                    Some(Tile::Box) => 'O',
+                    Some(Tile::Box) => '[',
+                    None => unreachable!(),
                 }
             };
             print!("{}", c);
@@ -202,93 +222,147 @@ fn pprint_grid(state: &State) {
     );
 }
 
-fn find_step(state: &State, at: &Point2, d: &Direction) -> Option<Point2> {
-    if DEBUG {
-        println!("finding step from {:?} heading {:?}", at, d);
-
-        let mut holes = Vec::new();
-        for y in state.bbox.min.y..=state.bbox.max.y {
-            for x in state.bbox.min.x..=state.bbox.max.x {
-                let p = Point2::new(x, y);
-                if !state.grid.contains_key(&p) {
-                    holes.push(p);
-                }
-            }
-        }
-        println!(
-            "Found these holes in the grid ({:?} of them): {:?}",
-            holes.len(),
-            holes
-        );
-    }
+fn step_horizontally(state: &State, at: &Point2, d: &Direction) -> Option<Vec<Point2>> {
+    let mut group = Vec::new();
 
     let mut step = d.step(at);
     while let Some(t) = state.grid.get(&step) {
-        if DEBUG {
-            println!("checked {:?} and saw {:?}", step, t);
-        }
         match t {
             Tile::Wall => {
-                if DEBUG {
-                    println!("found at final step {:?} :: {:?}", step, t);
-                }
                 return None;
             }
             Tile::Box => {
+                group.push(step);
                 step = d.step(&step);
-                if DEBUG {
-                    println!("going to check {:?} next", step);
-                }
+            }
+            Tile::Open if is_right_box(state, &step) => {
+                group.push(step);
+                step = d.step(&step);
             }
             Tile::Open => {
-                if DEBUG {
-                    println!("found at final step {:?} :: {:?}", step, t);
-                }
-                return Some(step);
+                return Some(group);
             }
         }
     }
-    if DEBUG {
-        println!("step left the grid: {:?}", step);
+
+    Some(group)
+}
+
+fn step_vertically(state: &State, at: &Point2, d: &Direction) -> Option<Vec<Point2>> {
+    let mut group = Vec::new();
+
+    let step = d.step(at);
+    match state.grid.get(&step) {
+        Some(Tile::Wall) => {
+            return None;
+        }
+        Some(Tile::Box) => {
+            let side = Direction::East.step(&step);
+            group.push(step);
+            group.push(side);
+            let lhs = step_vertically(state, &step, d);
+            let rhs = step_vertically(state, &side, d);
+            match (lhs, rhs) {
+                (Some(lhs), Some(rhs)) => {
+                    group.extend(lhs);
+                    group.extend(rhs);
+                }
+                _ => {
+                    return None;
+                }
+            }
+        }
+        Some(Tile::Open) if is_right_box(state, &step) => {
+            let side = Direction::West.step(&step);
+            group.push(step);
+            group.push(side);
+            let lhs = step_vertically(state, &step, d);
+            let rhs = step_vertically(state, &side, d);
+            match (lhs, rhs) {
+                (Some(lhs), Some(rhs)) => {
+                    group.extend(lhs);
+                    group.extend(rhs);
+                }
+                _ => {
+                    return None;
+                }
+            }
+        }
+        Some(Tile::Open) => {
+            return Some(group);
+        }
+        None => unreachable!(),
     }
-    None
+
+    Some(group)
 }
 
 fn run_bot(state: &mut State) {
+    if DEBUG {
+        println!("Initial state:");
+        pprint_grid(state);
+    }
+
     let movements = state.movements.clone();
 
     for (i, d) in movements.iter().enumerate() {
         if DEBUG {
-            println!("Step {:?} of {:?}", i, movements.len());
+            println!("Step {:?} of {:?}", i + 1, movements.len());
             pprint_grid(state);
             pause();
+
+            state.movements.remove(0);
         }
 
-        state.movements.remove(0);
+        let group = match d {
+            Direction::East | Direction::West => step_horizontally(state, &state.bot, d),
+            Direction::North | Direction::South => step_vertically(state, &state.bot, d),
+        };
 
-        if let Some(end) = find_step(state, &state.bot, d) {
-            if DEBUG {
-                println!(
-                    "found an end step from {:?} ({:?}) to {:?}",
-                    state.bot, d, end
-                );
-            }
-            // It's a direct step into an adjacent open tile.
-            if state.bot.manhattan_distance(&end) == 1 {
-                state.bot = end;
-                continue;
-            }
+        if let Some(mut group) = group {
+            group.sort_by_key(|p| match d {
+                Direction::North => (p.y, p.x),
+                Direction::South => (-p.y, p.x),
+                Direction::East => (-p.x, p.y),
+                Direction::West => (p.x, p.y),
+            });
+            // TODO: Or fix the recursive aggregation.
+            group.dedup();
 
-            // It's a box push, so tiles get swapped.
-            let step = d.step(&state.bot);
-            state.grid.insert(end, Tile::Box);
-            state.grid.insert(step, Tile::Open);
-            state.bot = step;
-        } else if DEBUG {
-            println!("no end step found, skipping move");
+            for p in group {
+                let step = d.step(&p);
+                // Exchange is always with an open space. This object is moving into an open space,
+                // and it leaves an equivalent open space behind it.
+                let old = state.grid.insert(p, Tile::Open).unwrap();
+                state.grid.insert(step, old);
+            }
+            state.bot = d.step(&state.bot);
         }
     }
+
+    if DEBUG {
+        println!("Final state:");
+        pprint_grid(state);
+    }
 }
+
+//fn score_box(bbox: &BBox2, at: &Point2) -> i32 {
+//    // Hours debugging this sort of nonsense because:
+//    //
+//    // "...distances are measured from the edge of the map
+//    // to the closest edge of the box in question..."
+//
+//    let h0 = bbox.max.y - at.y;
+//    let h1 = at.y - bbox.min.y;
+//
+//    let w0 = bbox.max.x - (at.x + 1);
+//    let w1 = at.x - bbox.min.x;
+//
+//    let h = h0.min(h1);
+//    let w = w0.min(w1);
+//
+//    100 * h + w
+//}
 
 fn solve(parsed: &State) -> i32 {
     let mut state = parsed.clone();
@@ -306,6 +380,7 @@ fn solve(parsed: &State) -> i32 {
 
 fn main() {
     let input = load_input(2024, 15);
+
     let parsed = parse_input(input);
     let answer = solve(&parsed);
     println!("Answer: {:?}", answer);
@@ -316,7 +391,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn day15a_example1() {
+    fn day15b_example1() {
         let input = "
 ########
 #..O.O.#
@@ -334,7 +409,7 @@ mod tests {
         let parsed = parse_input(input);
 
         assert_eq!(
-            BBox2::new(&Point2::new(0, 0), &Point2::new(7, 7)),
+            BBox2::new(&Point2::new(0, 0), &Point2::new(7 * 2, 7)),
             parsed.bbox
         );
         assert_eq!(
@@ -342,34 +417,32 @@ mod tests {
             parsed.movements.len()
         );
 
-        assert_eq!(Point2::new(2, 2), parsed.bot);
+        assert_eq!(Point2::new(2 * 2, 2), parsed.bot);
         assert_eq!(
             Some(Tile::Open),
-            parsed.grid.get(&Point2::new(2, 2)).cloned()
+            parsed.grid.get(&Point2::new(2 * 2, 2)).cloned()
         );
 
         assert_eq!(
             Some(Tile::Open),
-            parsed.grid.get(&Point2::new(1, 1)).cloned()
+            parsed.grid.get(&Point2::new(1 * 2, 1)).cloned()
         );
         assert_eq!(
             Some(Tile::Box),
-            parsed.grid.get(&Point2::new(4, 5)).cloned()
+            parsed.grid.get(&Point2::new(4 * 2, 5)).cloned()
         );
         assert_eq!(
             Some(Tile::Open),
-            parsed.grid.get(&Point2::new(5, 6)).cloned()
+            parsed.grid.get(&Point2::new(5 * 2, 6)).cloned()
         );
         assert_eq!(
             Some(Tile::Wall),
-            parsed.grid.get(&Point2::new(6, 7)).cloned()
+            parsed.grid.get(&Point2::new(6 * 2, 7)).cloned()
         );
-
-        assert_eq!(2028, solve(&parsed));
     }
 
     #[test]
-    fn day15a_example2() {
+    fn day15b_example2() {
         let input = "
 ##########
 #..O..O.O#
@@ -397,20 +470,74 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
         .to_string();
         let parsed = parse_input(input);
 
-        assert_eq!(10092, solve(&parsed));
+        assert_eq!(
+            BBox2::new(&Point2::new(0, 0), &Point2::new(18, 9)),
+            parsed.bbox
+        );
+
+        // ####################
+        // ##[].......[].[][]##
+        // ##[]...........[].##
+        // ##[]........[][][]##
+        // ##[]......[]....[]##
+        // ##..##......[]....##
+        // ##..[]............##
+        // ##..@......[].[][]##
+        // ##......[][]..[]..##
+        // ####################
+
+        // Losing my mind? Any spotchecked scores look correct.
+        // But the sum is half what it should be?
+        // ...
+        // Sigh, it's the original scoring function. So much lying this year.
+
+        //assert_eq!(102, score_box(&parsed.bbox, &Point2::new(2, 1)));
+        //assert_eq!(202, score_box(&parsed.bbox, &Point2::new(2, 2)));
+        //assert_eq!(302, score_box(&parsed.bbox, &Point2::new(2, 3)));
+        //assert_eq!(402, score_box(&parsed.bbox, &Point2::new(2, 4)));
+        //assert_eq!(304, score_box(&parsed.bbox, &Point2::new(4, 6)));
+        //assert_eq!(104, score_box(&parsed.bbox, &Point2::new(13, 8)));
+        //assert_eq!(102, score_box(&parsed.bbox, &Point2::new(15, 1)));
+
+        assert_eq!(9021, solve(&parsed));
     }
 
     #[test]
     fn day15_example3() {
         let input = "
-#######
-#...O..
-#......
+#########
+#..O@...#
+#.......#
+#########
+
+<v
         "
         .trim()
         .to_string();
         let parsed = parse_input(input);
 
-        assert_eq!(104, solve(&parsed));
+        assert_eq!(105, solve(&parsed));
+    }
+
+    #[test]
+    fn day15_example4() {
+        let input = "
+    #######
+    #...#.#
+    #.....#
+    #..OO@#
+    #..O..#
+    #.....#
+    #######
+
+    <vv<<^^<<^^
+        "
+        .trim()
+        .to_string();
+        let parsed = parse_input(input);
+
+        // Score taken from:
+        // https://www.reddit.com/r/adventofcode/comments/1heoj7f/comment/m25w22f/
+        assert_eq!(618, solve(&parsed));
     }
 }
