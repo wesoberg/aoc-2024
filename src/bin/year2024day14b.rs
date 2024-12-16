@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use aoc_2024_rs::*;
 use regex::Regex;
 
+const DEBUG: bool = false;
+
 #[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
 struct Point2 {
     x: i32,
@@ -158,7 +160,7 @@ fn longest_continuous_column(state: &State, x: i32) -> usize {
     let mut longest = 0;
     let mut candidate = 0;
     for i in 1..ys.len() {
-        if ys[i - 1] + 1 == ys[1] {
+        if ys[i - 1] + 1 == ys[i] {
             candidate += 1;
             if candidate > longest {
                 longest = candidate;
@@ -193,9 +195,11 @@ fn solve(parsed: &State) -> usize {
         if this_count > most_seen {
             step_seen = step;
             most_seen = this_count;
-            //println!("Seconds: {:?}, Count: {:?}", step, most_seen);
-            //pprint_grid(&state);
-            //pause();
+            if DEBUG {
+                println!("Seconds: {:?}, Count: {:?}", step, most_seen);
+                pprint_grid(&state);
+                pause();
+            }
         }
 
         if step - step_seen > 10_000 {
