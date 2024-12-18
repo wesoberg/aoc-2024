@@ -1,12 +1,14 @@
 use aoc_2024_rs::*;
 
+const DEBUG: bool = false;
+
 #[derive(Debug, PartialEq, Clone)]
 struct State {
-    a: i32,
-    b: i32,
-    c: i32,
-    program: Vec<i32>,
-    output: Vec<i32>,
+    a: u64,
+    b: u64,
+    c: u64,
+    program: Vec<u64>,
+    output: Vec<u64>,
 }
 
 impl State {
@@ -18,6 +20,15 @@ impl State {
             program: Vec::new(),
             output: Vec::new(),
         }
+    }
+
+    #[allow(dead_code)]
+    fn render_output(&self) -> String {
+        self.output
+            .iter()
+            .map(|o| o.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
     }
 }
 
@@ -49,7 +60,7 @@ fn parse_input(input: String) -> State {
     state
 }
 
-fn resolve_operand(state: &State, operand: i32, combo: bool) -> i32 {
+fn resolve_operand(state: &State, operand: u64, combo: bool) -> u64 {
     // Combo operands 0 through 3 represent literal values 0 through 3.
     // Combo operand 4 represents the value of register A.
     // Combo operand 5 represents the value of register B.
@@ -74,23 +85,59 @@ fn run(state: &mut State) {
     while ip + 1 < state.program.len() {
         let opcode = state.program[ip];
         let operand = state.program[ip + 1];
+
+        if DEBUG {
+            println!();
+            println!(
+                "Pointer: {:?}, Opcode: {:?}, Operand: {:?}",
+                ip, opcode, operand
+            );
+            println!("{:<20}  {:<20}  {:<30}", "PROGRAM", "OUTPUTS", "REGISTERS");
+            println!(
+                "{:<20 }  {:<20 }  rA: {:>8 }, rB: {:>8 }, rC: {:>8 }",
+                format!("{:?}", state.program),
+                format!("{:?}", state.output),
+                state.a,
+                state.b,
+                state.c
+            );
+        }
+
         match opcode {
             // adv combo
             0 => {
                 let r = resolve_operand(state, operand, true);
-                state.a /= 2i32.pow(r.try_into().unwrap());
+                state.a /= 2u64.pow(r.try_into().unwrap());
+                if DEBUG {
+                    println!(
+                        "opcode={:?}, ADV COMBO, r={:?}, a = a / (2 ** r) = {}",
+                        opcode, r, state.a
+                    );
+                }
                 ip += 2;
             }
             // bxl literal
             1 => {
                 let r = resolve_operand(state, operand, false);
                 state.b ^= r;
+                if DEBUG {
+                    println!(
+                        "opcode={:?}, BXL LITERAL, r={:?}, b = b ^ r = {:?}",
+                        opcode, r, state.b
+                    );
+                }
                 ip += 2;
             }
             // bst combo
             2 => {
                 let r = resolve_operand(state, operand, true);
                 state.b = r.rem_euclid(8);
+                if DEBUG {
+                    println!(
+                        "opcode={:?}, BST COMBO, r={:?}, b = r % 8 = {:?}",
+                        opcode, r, state.b
+                    );
+                }
                 ip += 2;
             }
             // jnz literal
@@ -98,31 +145,60 @@ fn run(state: &mut State) {
                 if state.a != 0 {
                     let r = resolve_operand(state, operand, false);
                     ip = r.try_into().unwrap();
+                    if DEBUG {
+                        println!("opcode={:?}, JNZ LITERAL, r={:?}, ip = {:?}", opcode, r, ip);
+                    }
                 } else {
+                    if DEBUG {
+                        println!("opcode={:?}, JNZ LITERAL, no-op", opcode);
+                    }
                     ip += 2;
                 }
             }
             // bxc none
             4 => {
                 state.b ^= state.c;
+                if DEBUG {
+                    println!("opcode={:?}, BXC NONE, b = b ^ c = {:?}", opcode, state.b);
+                }
                 ip += 2;
             }
             // out combo
             5 => {
                 let r = resolve_operand(state, operand, true);
                 state.output.push(r.rem_euclid(8));
+                if DEBUG {
+                    println!(
+                        "opcode={:?}, OUT COMBO, r={:?}, out += r % 8 = {:?}",
+                        opcode,
+                        r,
+                        state.output.last().unwrap()
+                    );
+                }
                 ip += 2;
             }
             // bdv combo
             6 => {
                 let r = resolve_operand(state, operand, true);
-                state.b = state.a / 2i32.pow(r.try_into().unwrap());
+                state.b = state.a / 2u64.pow(r.try_into().unwrap());
+                if DEBUG {
+                    println!(
+                        "opcode={:?}, BVD COMBO, r={:?}, b = a / (2 ** r) = {:?}",
+                        opcode, r, state.b
+                    );
+                }
                 ip += 2;
             }
             // cdv combo
             7 => {
                 let r = resolve_operand(state, operand, true);
-                state.c = state.a / 2i32.pow(r.try_into().unwrap());
+                state.c = state.a / 2u64.pow(r.try_into().unwrap());
+                if DEBUG {
+                    println!(
+                        "opcode={:?}, CDV COMBO, r={:?}, c = a / (2 ** r) = {:?}",
+                        opcode, r, state.c
+                    );
+                }
                 ip += 2;
             }
             _ => panic!("Unknown opcode: {:?}", opcode),
@@ -130,15 +206,59 @@ fn run(state: &mut State) {
     }
 }
 
-fn solve(parsed: &State) -> String {
-    let mut state: State = parsed.clone();
-    run(&mut state);
-    state
-        .output
-        .iter()
-        .map(|o| o.to_string())
-        .collect::<Vec<_>>()
-        .join(",")
+fn search(state: &State, candidate: u64) -> Option<u64> {
+    // Printing out the instructions and what they are doing reveals a loop. Something like:
+    //
+    // do {
+    // b = a % 8
+    // b = b ^ 1
+    // c = a / ( 2 ** b )
+    // a = a / ( 2 ** 3 )
+    // b = b ^ 4
+    // b = b ^ c
+    // out <- b % 8
+    // } (while a != 0)
+    //
+    // Here the 'a' input is first read with modulo 8, meaning its value is only [0, 7], or the
+    // last 3 bits. Then 'a' is divided by 2 ** 3 (which is 8), so this is divmod() in octal to
+    // walk through the number from right to left, one octal digit at a time.
+    //
+    // Expanded form of this example which turned out useless aside from quick spot checks:
+    // out <- ((((a % 8) ^ 1) ^ 4) ^ (a / (2 ** ((a % 8) ^ 1)))) % 8
+    //
+    // To solve this, for each [0, 7], see if it outputs the next program digit after running the
+    // loop above. Then for each [0, 7] not rejected, repeat. Repeat... This builds up the final
+    // 'a' from least to most significant digit.
+    //
+    // Side node, the bounds for the search space for 16 digit outputs from 'a' in this example:
+    // lower =  35_184_372_088_832
+    // upper = 281_474_976_710_655
+
+    for next in 0..8 {
+        let mut attempt = state.clone();
+        attempt.a = (candidate << 3) + next;
+        run(&mut attempt);
+
+        if attempt.output.len() > attempt.program.len() {
+            continue;
+        }
+        if attempt.output[0] != attempt.program[attempt.program.len() - attempt.output.len()] {
+            continue;
+        }
+
+        if attempt.output == attempt.program {
+            return Some((candidate << 3) + next);
+        }
+        if let Some(value) = search(state, (candidate << 3) + next) {
+            return Some(value);
+        }
+    }
+
+    None
+}
+
+fn solve(parsed: &State) -> u64 {
+    search(parsed, 0).unwrap()
 }
 
 fn main() {
@@ -153,7 +273,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn day17a_example1() {
+    fn day17b_example1() {
         // If register C contains 9, the program 2,6 would set register B to 1.
         let input = "
 Register A: 0
@@ -249,7 +369,7 @@ Program: 4,0
     }
 
     #[test]
-    fn day17a_example2() {
+    fn day17b_example2() {
         let input = "
 Register A: 729
 Register B: 0
@@ -270,6 +390,29 @@ Program: 0,1,5,4,3,0
             },
             parsed
         );
-        assert_eq!("4,6,3,5,6,3,5,2,1,0", solve(&parsed));
+    }
+
+    #[test]
+    fn day17b_example3() {
+        let input = "
+Register A: 2024
+Register B: 0
+Register C: 0
+
+Program: 0,3,5,4,3,0
+        "
+        .trim()
+        .to_string();
+        let parsed = parse_input(input);
+        assert_eq!(
+            State {
+                a: 2024,
+                b: 0,
+                c: 0,
+                program: vec![0, 3, 5, 4, 3, 0],
+                output: vec![]
+            },
+            parsed
+        );
     }
 }
