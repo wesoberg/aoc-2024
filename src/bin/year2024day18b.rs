@@ -191,19 +191,25 @@ fn tick(state: &mut State, count: usize) {
 }
 
 fn solve(parsed: &State, depth: usize) -> String {
-    let mut state = parsed.clone();
-    tick(&mut state, depth);
+    // Binary search for this first condition change.
 
-    // Goofy off-by-one errors here.
-    for step in (depth + 1)..state.obstacles.len() {
-        tick(&mut state, step);
+    let mut left = depth;
+    let mut right = parsed.obstacles.len();
+
+    let mut state = parsed.clone();
+    while left <= right {
+        let m = (left + right) / 2;
+        state = parsed.clone();
+        tick(&mut state, m);
         if has_path(&state) {
-            continue;
+            left = m + 1;
+        } else {
+            right = m - 1;
         }
-        let p = state.obstacles[step - 1];
-        return format!("{},{}", p.x, p.y);
     }
-    unreachable!("No possibilities found.");
+
+    let p = state.obstacles[left - 1];
+    format!("{},{}", p.x, p.y)
 }
 
 fn main() {
@@ -285,4 +291,3 @@ mod tests {
         assert_eq!("6,1", solve(&mut state, 12));
     }
 }
-
