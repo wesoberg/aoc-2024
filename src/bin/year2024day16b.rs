@@ -1,6 +1,7 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::BinaryHeap;
 
 use aoc_2024_rs::*;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 const DEBUG: bool = false;
 
@@ -99,7 +100,7 @@ enum Tile {
 
 #[derive(Debug, Clone)]
 struct State {
-    grid: HashMap<Point2, Tile>,
+    grid: FxHashMap<Point2, Tile>,
     bbox: BBox2,
     start_at: Point2,
     start_face: Direction,
@@ -109,7 +110,7 @@ struct State {
 impl State {
     fn new() -> Self {
         Self {
-            grid: HashMap::new(),
+            grid: FxHashMap::default(),
             bbox: BBox2::default(),
             start_at: Point2::min(),
             start_face: Direction::East,
@@ -200,10 +201,11 @@ impl PartialOrd for Node {
 
 // Interestingly, Clippy only complained about "type_complexity" today? Should I feel proud or
 // ashamed that earlier days haven't triggered this already?
-type LowestCostAndDistHashMap = (i32, HashMap<(Point2, Direction), i32>);
+type LowestCostAndDistHashMap = (i32, FxHashMap<(Point2, Direction), i32>);
 
 fn shortest_paths(state: &State) -> Option<LowestCostAndDistHashMap> {
-    let mut dist: HashMap<(Point2, Direction), i32> = HashMap::new();
+    let mut dist: FxHashMap<(Point2, Direction), i32> = FxHashMap::default();
+    dist.reserve((state.bbox.max.x * state.bbox.max.y).try_into().unwrap());
 
     let mut heap = BinaryHeap::new();
 
@@ -267,7 +269,8 @@ fn shortest_paths(state: &State) -> Option<LowestCostAndDistHashMap> {
             }
 
             // We're already on this tile if we've rotated on it. Prune paths that would on the
-            // next iteration immediately try to walk into a wall.
+            // next iteration immediately try to walk into a wall. Mostly because watching this
+            // happen was annoying.
             if direction != next.direction
                 && state.grid.get(&next.direction.step(&next.position)) == Some(&Tile::Wall)
             {
@@ -332,9 +335,9 @@ fn solve(parsed: &State) -> i32 {
 
     // Probably don't have to try all points and all directions, but I kind of want to be done.
     // This should be a bunch of quick HashMap checks and some simple math, so it should be fast,
-    // but...
+    // but... Well, it's faster with FxHash anyway.
 
-    let mut best_path_points = HashSet::new();
+    let mut best_path_points = FxHashSet::default();
     for y in state.bbox.min.y..=state.bbox.max.y {
         for x in state.bbox.min.x..=state.bbox.max.x {
             let p = Point2::new(x, y);
@@ -440,4 +443,3 @@ mod tests {
         assert_eq!(64, solve(&parsed));
     }
 }
-
