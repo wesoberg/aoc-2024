@@ -119,23 +119,12 @@ fn pprint_grid(state: &State) {
 }
 
 fn step(p: &Point2, v: &Point2, bbox: &BBox2) -> Point2 {
-    let mut q = *p;
-    q.x += v.x;
-    q.y += v.y;
-
-    if q.x < 0 {
-        q.x += bbox.max.x + 1;
-    } else if q.x > bbox.max.x {
-        q.x -= bbox.max.x + 1;
-    }
-
-    if q.y < 0 {
-        q.y += bbox.max.y + 1;
-    } else if q.y > bbox.max.y {
-        q.y -= bbox.max.y + 1;
-    }
-
-    q
+    // Hilarious that I didn't want to "bother" making it modulo before, so had a lot more code
+    // here to check all the min/max bounds and perform offset corrections.
+    Point2::new(
+        (p.x + v.x).rem_euclid(bbox.max.x + 1),
+        (p.y + v.y).rem_euclid(bbox.max.y + 1),
+    )
 }
 
 fn tick(state: &State) -> State {
@@ -187,8 +176,15 @@ fn solve(parsed: &State) -> usize {
     let mut step_seen = 0;
     let mut most_seen = 0;
 
+    // Forgot about this trick and heard it was mentioned on the sub. Since the pathing is fixed,
+    // and pathing loops around the space, the upper bound can be W*H, because states must repeat
+    // after that. Does this only work if the dimensions are coprime?
+    let upper_bound: usize = ((parsed.bbox.max.x + 1) * (parsed.bbox.max.y + 1))
+        .try_into()
+        .unwrap();
+
     let mut state: State = parsed.clone();
-    for step in 1.. {
+    for step in 1..upper_bound {
         state = tick(&state);
 
         let this_count = longest_continuous_column(&state, 65);
@@ -200,10 +196,6 @@ fn solve(parsed: &State) -> usize {
                 pprint_grid(&state);
                 pause();
             }
-        }
-
-        if step - step_seen > 10_000 {
-            break;
         }
     }
 
