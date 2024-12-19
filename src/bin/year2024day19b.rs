@@ -63,17 +63,19 @@ fn parse_input(input: String) -> State {
 }
 
 #[cached(
-    ty = "UnboundCache<String, bool>",
+    ty = "UnboundCache<String, u64>",
     create = "{ UnboundCache::new() }",
     convert = r#"{ format!("{:?}", design) }"#
 )]
-fn is_possible(patterns: &Vec<Vec<Color>>, design: &[Color]) -> bool {
+fn is_possible(patterns: &Vec<Vec<Color>>, design: &[Color]) -> u64 {
+    let mut acc = 0;
     if design.is_empty() {
-        return false;
+        return acc;
     }
     for pattern in patterns {
         if pattern.len() == design.len() && pattern == design {
-            return true;
+            // Last bug was still early aborting here with a return.
+            acc += 1;
         }
         if pattern.len() > design.len() {
             continue;
@@ -81,20 +83,16 @@ fn is_possible(patterns: &Vec<Vec<Color>>, design: &[Color]) -> bool {
         if !design.starts_with(pattern) {
             continue;
         }
-        if is_possible(patterns, &design[pattern.len()..]) {
-            return true;
-        }
+        acc += is_possible(patterns, &design[pattern.len()..]);
     }
 
-    false
+    acc
 }
 
-fn solve(parsed: &State) -> usize {
+fn solve(parsed: &State) -> u64 {
     let mut accumulator = 0;
     for design in &parsed.designs {
-        if is_possible(&parsed.patterns, design) {
-            accumulator += 1;
-        }
+        accumulator += is_possible(&parsed.patterns, design);
     }
     accumulator
 }
@@ -111,7 +109,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn day19a_example1() {
+    fn day19b_example1() {
         let input = "
 r, wr, b, g, bwu, rb, gb, br
 
@@ -154,15 +152,23 @@ bbrgwb
             parsed
         );
 
-        assert_eq!(true, is_possible(&parsed.patterns, &parsed.designs[0]));
-        assert_eq!(true, is_possible(&parsed.patterns, &parsed.designs[1]));
-        assert_eq!(true, is_possible(&parsed.patterns, &parsed.designs[2]));
-        assert_eq!(true, is_possible(&parsed.patterns, &parsed.designs[3]));
-        assert_eq!(false, is_possible(&parsed.patterns, &parsed.designs[4]));
-        assert_eq!(true, is_possible(&parsed.patterns, &parsed.designs[5]));
-        assert_eq!(true, is_possible(&parsed.patterns, &parsed.designs[6]));
-        assert_eq!(false, is_possible(&parsed.patterns, &parsed.designs[7]));
+        // brwrr
+        assert_eq!(2, is_possible(&parsed.patterns, &parsed.designs[0]));
+        // bggr
+        assert_eq!(1, is_possible(&parsed.patterns, &parsed.designs[1]));
+        // gbbr
+        assert_eq!(4, is_possible(&parsed.patterns, &parsed.designs[2]));
+        // rrbgbr
+        assert_eq!(6, is_possible(&parsed.patterns, &parsed.designs[3]));
+        // ubwu
+        assert_eq!(0, is_possible(&parsed.patterns, &parsed.designs[4]));
+        // bwurrg
+        assert_eq!(1, is_possible(&parsed.patterns, &parsed.designs[5]));
+        // brgr
+        assert_eq!(2, is_possible(&parsed.patterns, &parsed.designs[6]));
+        // bbrgwb
+        assert_eq!(0, is_possible(&parsed.patterns, &parsed.designs[7]));
 
-        assert_eq!(6, solve(&parsed));
+        assert_eq!(16, solve(&parsed));
     }
 }
