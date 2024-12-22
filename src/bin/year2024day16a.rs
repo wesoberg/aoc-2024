@@ -4,93 +4,6 @@ use aoc_2024_rs::*;
 
 const DEBUG: bool = false;
 
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone, PartialOrd, Ord)]
-struct Point2 {
-    x: i32,
-    y: i32,
-}
-
-impl Point2 {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    fn min() -> Self {
-        Self::new(i32::MIN, i32::MIN)
-    }
-
-    fn max() -> Self {
-        Self::new(i32::MAX, i32::MAX)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct BBox2 {
-    min: Point2,
-    max: Point2,
-}
-
-impl BBox2 {
-    #[allow(dead_code)]
-    fn new(a: &Point2, b: &Point2) -> Self {
-        Self {
-            min: Point2::new(a.x.min(b.x), a.y.min(b.y)),
-            max: Point2::new(a.x.max(b.x), a.y.max(b.y)),
-        }
-    }
-
-    fn default() -> Self {
-        Self {
-            min: Point2::max(),
-            max: Point2::min(),
-        }
-    }
-
-    fn update(&mut self, p: &Point2) {
-        self.min.x = self.min.x.min(p.x);
-        self.min.y = self.min.y.min(p.y);
-        self.max.x = self.max.x.max(p.x);
-        self.max.y = self.max.y.max(p.y);
-    }
-
-    #[allow(dead_code)]
-    fn contains(&self, p: &Point2) -> bool {
-        p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-enum Direction {
-    North,
-    East,
-    South,
-    West,
-}
-
-impl Direction {
-    fn rotate_right(&self) -> Self {
-        match self {
-            Self::North => Self::East,
-            Self::East => Self::South,
-            Self::South => Self::West,
-            Self::West => Self::North,
-        }
-    }
-
-    fn rotate_left(&self) -> Self {
-        self.rotate_right().rotate_right().rotate_right()
-    }
-
-    fn step(&self, p: &Point2) -> Point2 {
-        match self {
-            Self::North => Point2::new(p.x, p.y - 1),
-            Self::East => Point2::new(p.x + 1, p.y),
-            Self::South => Point2::new(p.x, p.y + 1),
-            Self::West => Point2::new(p.x - 1, p.y),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 enum Tile {
     Wall,
@@ -98,11 +11,11 @@ enum Tile {
 }
 
 struct State {
-    grid: HashMap<Point2, Tile>,
-    bbox: BBox2,
-    start_at: Point2,
+    grid: HashMap<Point2<i32>, Tile>,
+    bbox: BBox2<i32>,
+    start_at: Point2<i32>,
     start_face: Direction,
-    end_at: Point2,
+    end_at: Point2<i32>,
 }
 
 impl State {
@@ -145,7 +58,7 @@ fn parse_input(input: String) -> State {
     state
 }
 
-fn pprint_grid(state: &State, at: &Point2, face: &Direction) {
+fn pprint_grid(state: &State, at: &Point2<i32>, face: &Direction) {
     for y in state.bbox.min.y..=state.bbox.max.y {
         for x in state.bbox.min.x..=state.bbox.max.x {
             let p = Point2::new(x, y);
@@ -178,7 +91,7 @@ fn pprint_grid(state: &State, at: &Point2, face: &Direction) {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct Node {
     cost: i32,
-    position: Point2,
+    position: Point2<i32>,
     direction: Direction,
 }
 
@@ -198,7 +111,7 @@ impl PartialOrd for Node {
 }
 
 fn shortest_path(state: &State) -> Option<i32> {
-    let mut dist: HashMap<(Point2, Direction), i32> = HashMap::new();
+    let mut dist: HashMap<(Point2<i32>, Direction), i32> = HashMap::new();
 
     let mut heap = BinaryHeap::new();
 
@@ -391,4 +304,3 @@ mod tests {
         assert_eq!(11048, solve(&parsed));
     }
 }
-

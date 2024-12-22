@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use aoc_2024_rs::*;
 
-fn parse_input(input: String) -> HashMap<(i32, i32), char> {
+fn parse_input(input: String) -> HashMap<Point2<i32>, char> {
     let mut grid = HashMap::new();
 
     for (y, line) in input.lines().enumerate() {
@@ -10,34 +10,35 @@ fn parse_input(input: String) -> HashMap<(i32, i32), char> {
             continue;
         }
         for (x, col) in line.trim().char_indices() {
-            grid.insert((x.try_into().unwrap(), y.try_into().unwrap()), col);
+            let p = Point2::new(x.try_into().unwrap(), y.try_into().unwrap());
+            grid.insert(p, col);
         }
     }
     grid
 }
 
-fn get_bounds(grid: &HashMap<(i32, i32), char>) -> (i32, i32, i32, i32) {
+fn get_bounds(grid: &HashMap<Point2<i32>, char>) -> BBox2<i32> {
     let mut min_x = i32::MAX;
     let mut min_y = i32::MAX;
     let mut max_x = 0;
     let mut max_y = 0;
 
-    for (x, y) in grid.keys() {
-        min_x = min_x.min(*x);
-        min_y = min_y.min(*y);
-        max_x = max_x.max(*x);
-        max_y = max_y.max(*y);
+    for p in grid.keys() {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
     }
 
-    (min_x, min_y, max_x, max_y)
+    BBox2::new(&Point2::new(min_x, min_y), &Point2::new(max_x, max_y))
 }
 
 #[allow(dead_code)]
-fn pprint_grid(grid: &HashMap<(i32, i32), char>) {
-    let (min_x, min_y, max_x, max_y) = get_bounds(grid);
-    for y in min_y..=max_y {
-        for x in min_x..=max_x {
-            print!("{}", grid.get(&(x, y)).unwrap());
+fn pprint_grid(grid: &HashMap<Point2<i32>, char>) {
+    let bbox = get_bounds(grid);
+    for y in bbox.min.y..=bbox.max.y {
+        for x in bbox.min.x..=bbox.max.x {
+            print!("{}", grid.get(&Point2::new(x, y)).unwrap());
         }
         println!();
     }
@@ -64,19 +65,19 @@ fn get_steps(word_len: i32) -> Vec<Vec<(i32, i32)>> {
     ]
 }
 
-fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
+fn get_word_vectors(grid: &HashMap<Point2<i32>, char>) -> Vec<Vec<(i32, i32)>> {
     let word = ['X', 'M', 'A', 'S'];
     let steps = get_steps(word.len().try_into().unwrap());
 
     let mut hits = Vec::new();
 
-    let (min_x, min_y, max_x, max_y) = get_bounds(grid);
-    for y in min_y..=max_y {
-        for x in min_x..=max_x {
+    let bbox = get_bounds(grid);
+    for y in bbox.min.y..=bbox.max.y {
+        for x in bbox.min.x..=bbox.max.x {
             for step in &steps {
                 let mut failed = false;
                 for (i, (dx, dy)) in step.iter().enumerate() {
-                    match grid.get(&(x + dx, y + dy)) {
+                    match grid.get(&Point2::new(x + dx, y + dy)) {
                         Some(c) => {
                             if c != word.get(i).unwrap() {
                                 failed = true;
@@ -99,7 +100,7 @@ fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
     hits
 }
 
-fn solve(parsed: HashMap<(i32, i32), char>) -> usize {
+fn solve(parsed: HashMap<Point2<i32>, char>) -> usize {
     get_word_vectors(&parsed).len()
 }
 

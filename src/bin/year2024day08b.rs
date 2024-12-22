@@ -2,63 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use aoc_2024_rs::*;
 
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
-struct Point2 {
-    x: i32,
-    y: i32,
-}
-
-impl Point2 {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    fn min() -> Self {
-        Self::new(i32::MIN, i32::MIN)
-    }
-
-    fn max() -> Self {
-        Self::new(i32::MAX, i32::MAX)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct BBox2 {
-    min: Point2,
-    max: Point2,
-}
-
-impl BBox2 {
-    #[allow(dead_code)]
-    fn new(a: &Point2, b: &Point2) -> Self {
-        Self {
-            min: Point2::new(a.x.min(b.x), a.y.min(b.y)),
-            max: Point2::new(a.x.max(b.x), a.y.max(b.y)),
-        }
-    }
-
-    fn default() -> Self {
-        Self {
-            min: Point2::max(),
-            max: Point2::min(),
-        }
-    }
-
-    fn update(&mut self, p: &Point2) {
-        self.min.x = self.min.x.min(p.x);
-        self.min.y = self.min.y.min(p.y);
-        self.max.x = self.max.x.max(p.x);
-        self.max.y = self.max.y.max(p.y);
-    }
-
-    fn contains(&self, p: &Point2) -> bool {
-        p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
-    }
-}
-
 struct State {
-    towers: HashMap<char, Vec<Point2>>,
-    bbox: BBox2,
+    towers: HashMap<char, Vec<Point2<i32>>>,
+    bbox: BBox2<i32>,
 }
 
 impl State {
@@ -98,7 +44,7 @@ fn parse_input(input: String) -> State {
     state
 }
 
-fn get_antinodes(towers: &[Point2], bbox: &BBox2) -> Vec<Point2> {
+fn get_antinodes(towers: &[Point2<i32>], bbox: &BBox2<i32>) -> Vec<Point2<i32>> {
     let mut antinodes = Vec::new();
 
     // .a.

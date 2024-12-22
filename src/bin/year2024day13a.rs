@@ -1,32 +1,11 @@
 use aoc_2024_rs::*;
 use regex::Regex;
 
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
-struct Point2 {
-    x: i32,
-    y: i32,
-}
-
-impl Point2 {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    fn min() -> Self {
-        Self::new(i32::MIN, i32::MIN)
-    }
-
-    #[allow(dead_code)]
-    fn max() -> Self {
-        Self::new(i32::MAX, i32::MAX)
-    }
-}
-
 #[derive(Debug, PartialEq)]
 struct Machine {
-    a: Point2,
-    b: Point2,
-    p: Point2,
+    a: Point2<i32>,
+    b: Point2<i32>,
+    p: Point2<i32>,
 }
 
 impl Machine {

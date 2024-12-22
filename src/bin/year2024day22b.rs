@@ -150,4 +150,3 @@ mod tests {
         assert_eq!(7 + 7 + 9, solve(&parsed, 2000));
     }
 }
-

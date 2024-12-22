@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use aoc_2024_rs::*;
 
-fn parse_input(input: String) -> HashMap<(i32, i32), char> {
+fn parse_input(input: String) -> HashMap<Point2<i32>, char> {
     let mut grid = HashMap::new();
 
     for (y, line) in input.lines().enumerate() {
@@ -10,40 +10,43 @@ fn parse_input(input: String) -> HashMap<(i32, i32), char> {
             continue;
         }
         for (x, col) in line.trim().char_indices() {
-            grid.insert((x.try_into().unwrap(), y.try_into().unwrap()), col);
+            grid.insert(
+                Point2::new(x.try_into().unwrap(), y.try_into().unwrap()),
+                col,
+            );
         }
     }
     grid
 }
 
-fn get_bounds(grid: &HashMap<(i32, i32), char>) -> (i32, i32, i32, i32) {
+fn get_bounds(grid: &HashMap<Point2<i32>, char>) -> BBox2<i32> {
     let mut min_x = i32::MAX;
     let mut min_y = i32::MAX;
     let mut max_x = 0;
     let mut max_y = 0;
 
-    for (x, y) in grid.keys() {
-        min_x = min_x.min(*x);
-        min_y = min_y.min(*y);
-        max_x = max_x.max(*x);
-        max_y = max_y.max(*y);
+    for p in grid.keys() {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
     }
 
-    (min_x, min_y, max_x, max_y)
+    BBox2::new(&Point2::new(min_x, min_y), &Point2::new(max_x, max_y))
 }
 
 #[allow(dead_code)]
-fn pprint_grid(grid: &HashMap<(i32, i32), char>) {
-    let (min_x, min_y, max_x, max_y) = get_bounds(grid);
-    for y in min_y..=max_y {
-        for x in min_x..=max_x {
-            print!("{}", grid.get(&(x, y)).unwrap());
+fn pprint_grid(grid: &HashMap<Point2<i32>, char>) {
+    let bbox = get_bounds(grid);
+    for y in bbox.min.y..=bbox.max.y {
+        for x in bbox.min.x..=bbox.max.x {
+            print!("{}", grid.get(&Point2::new(x, y)).unwrap());
         }
         println!();
     }
 }
 
-fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
+fn get_word_vectors(grid: &HashMap<Point2<i32>, char>) -> Vec<Vec<(i32, i32)>> {
     let anchor_value = 'A';
     let neighbor_values = HashSet::from([Some(&'M'), Some(&'S')]);
 
@@ -52,10 +55,10 @@ fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
 
     let mut hits = Vec::new();
 
-    let (min_x, min_y, max_x, max_y) = get_bounds(grid);
-    for y in min_y..=max_y {
-        for x in min_x..=max_x {
-            if *grid.get(&(x, y)).unwrap() != anchor_value {
+    let bbox = get_bounds(grid);
+    for y in bbox.min.y..=bbox.max.y {
+        for x in bbox.min.x..=bbox.max.x {
+            if *grid.get(&Point2::new(x, y)).unwrap() != anchor_value {
                 continue;
             }
 
@@ -70,11 +73,11 @@ fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
 
             let forward_candidate = forward_coords
                 .iter()
-                .map(|(nx, ny)| grid.get(&(*nx, *ny)))
+                .map(|(nx, ny)| grid.get(&Point2::new(*nx, *ny)))
                 .collect::<HashSet<Option<&char>>>();
             let backward_candidate = backward_coords
                 .iter()
-                .map(|(nx, ny)| grid.get(&(*nx, *ny)))
+                .map(|(nx, ny)| grid.get(&Point2::new(*nx, *ny)))
                 .collect::<HashSet<Option<&char>>>();
 
             if forward_candidate == neighbor_values && backward_candidate == neighbor_values {
@@ -89,7 +92,7 @@ fn get_word_vectors(grid: &HashMap<(i32, i32), char>) -> Vec<Vec<(i32, i32)>> {
     hits
 }
 
-fn solve(parsed: HashMap<(i32, i32), char>) -> usize {
+fn solve(parsed: HashMap<Point2<i32>, char>) -> usize {
     get_word_vectors(&parsed).len()
 }
 

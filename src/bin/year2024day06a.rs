@@ -2,34 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use aoc_2024_rs::*;
 
-#[derive(Debug, PartialEq, Clone)]
-enum Direction {
-    North,
-    East,
-    South,
-    West,
-}
-
-impl Direction {
-    fn rotate_right(&self) -> Self {
-        match self {
-            Self::North => Self::East,
-            Self::East => Self::South,
-            Self::South => Self::West,
-            Self::West => Self::North,
-        }
-    }
-
-    fn step(&self, x: i32, y: i32) -> (i32, i32) {
-        match self {
-            Self::North => (x, y - 1),
-            Self::East => (x + 1, y),
-            Self::South => (x, y + 1),
-            Self::West => (x - 1, y),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 enum Tile {
     Open,
@@ -66,9 +38,9 @@ impl std::fmt::Display for Tile {
 
 #[derive(Debug)]
 struct State {
-    grid: HashMap<(i32, i32), Tile>,
-    bbox: ((i32, i32), (i32, i32)),
-    guard_at: (i32, i32),
+    grid: HashMap<Point2<i32>, Tile>,
+    bbox: BBox2<i32>,
+    guard_at: Point2<i32>,
     guard_face: Direction,
 }
 
@@ -76,8 +48,8 @@ impl State {
     fn new() -> Self {
         Self {
             grid: HashMap::new(),
-            bbox: ((i32::MAX, i32::MAX), (0i32, 0i32)),
-            guard_at: (0, 0),
+            bbox: BBox2::default(),
+            guard_at: Point2::new(0, 0),
             guard_face: Direction::North,
         }
     }
@@ -91,21 +63,17 @@ fn parse_input(input: String) -> State {
             continue;
         }
         for (x, col) in line.trim().char_indices() {
+            let p = Point2::new(x.try_into().unwrap(), y.try_into().unwrap());
             let t = match Tile::from(col) {
                 Tile::Guard(d) => {
-                    state.guard_at = (x.try_into().unwrap(), y.try_into().unwrap());
+                    state.guard_at = p;
                     state.guard_face = d;
                     Tile::Open
                 }
                 other => other,
             };
-            state
-                .grid
-                .insert((x.try_into().unwrap(), y.try_into().unwrap()), t);
-            state.bbox.0 .0 = state.bbox.0 .0.min(x.try_into().unwrap());
-            state.bbox.0 .1 = state.bbox.0 .1.min(y.try_into().unwrap());
-            state.bbox.1 .0 = state.bbox.1 .0.max(x.try_into().unwrap());
-            state.bbox.1 .1 = state.bbox.1 .1.max(y.try_into().unwrap());
+            state.grid.insert(p, t);
+            state.bbox.update(&p);
         }
     }
 
@@ -114,23 +82,23 @@ fn parse_input(input: String) -> State {
 
 #[allow(dead_code)]
 fn pprint_grid(state: &State) {
-    for y in state.bbox.0 .1..=state.bbox.1 .1 {
-        for x in state.bbox.0 .0..=state.bbox.1 .0 {
-            print!("{}", state.grid.get(&(x, y)).unwrap());
+    for y in state.bbox.min.y..=state.bbox.max.y {
+        for x in state.bbox.min.x..=state.bbox.max.x {
+            print!("{}", state.grid.get(&Point2::new(x, y)).unwrap());
         }
         println!();
     }
 }
 
-fn patrol(state: &State) -> HashSet<(i32, i32)> {
+fn patrol(state: &State) -> HashSet<Point2<i32>> {
     let mut guard_at = state.guard_at;
-    let mut guard_face = state.guard_face.clone();
+    let mut guard_face = state.guard_face;
 
     let mut visited = HashSet::new();
     visited.insert(guard_at);
 
     loop {
-        let next_at = guard_face.step(guard_at.0, guard_at.1);
+        let next_at = guard_face.step(&guard_at);
 
         match state.grid.get(&next_at) {
             Some(t) => match t {
@@ -185,15 +153,24 @@ mod tests {
 
         pprint_grid(&parsed);
 
-        assert_eq!(&Tile::Open, parsed.grid.get(&(0, 0)).unwrap());
-        assert_eq!(&Tile::Obstruction, parsed.grid.get(&(4, 0)).unwrap());
-        assert_eq!(&Tile::Open, parsed.grid.get(&(4, 6)).unwrap());
-        assert_eq!(&Tile::Obstruction, parsed.grid.get(&(6, 9)).unwrap());
+        assert_eq!(&Tile::Open, parsed.grid.get(&Point2::new(0, 0)).unwrap());
+        assert_eq!(
+            &Tile::Obstruction,
+            parsed.grid.get(&Point2::new(4, 0)).unwrap()
+        );
+        assert_eq!(&Tile::Open, parsed.grid.get(&Point2::new(4, 6)).unwrap());
+        assert_eq!(
+            &Tile::Obstruction,
+            parsed.grid.get(&Point2::new(6, 9)).unwrap()
+        );
 
-        assert_eq!((4, 6), parsed.guard_at);
+        assert_eq!(Point2::new(4, 6), parsed.guard_at);
         assert_eq!(Direction::North, parsed.guard_face);
 
-        assert_eq!(((0, 0,), (9, 9)), parsed.bbox);
+        assert_eq!(
+            BBox2::new(&Point2::new(0, 0), &Point2::new(9, 9)),
+            parsed.bbox
+        );
 
         assert_eq!(41, solve(parsed));
     }

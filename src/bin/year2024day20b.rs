@@ -1,98 +1,6 @@
 use aoc_2024_rs::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone, PartialOrd, Ord)]
-struct Point2 {
-    x: i32,
-    y: i32,
-}
-
-impl Point2 {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    fn min() -> Self {
-        Self::new(i32::MIN, i32::MIN)
-    }
-
-    fn max() -> Self {
-        Self::new(i32::MAX, i32::MAX)
-    }
-
-    fn manhattan_distance(&self, other: &Point2) -> i32 {
-        (self.x - other.x).abs() + (self.y - other.y).abs()
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct BBox2 {
-    min: Point2,
-    max: Point2,
-}
-
-impl BBox2 {
-    #[allow(dead_code)]
-    fn new(a: &Point2, b: &Point2) -> Self {
-        Self {
-            min: Point2::new(a.x.min(b.x), a.y.min(b.y)),
-            max: Point2::new(a.x.max(b.x), a.y.max(b.y)),
-        }
-    }
-
-    fn default() -> Self {
-        Self {
-            min: Point2::max(),
-            max: Point2::min(),
-        }
-    }
-
-    fn update(&mut self, p: &Point2) {
-        self.min.x = self.min.x.min(p.x);
-        self.min.y = self.min.y.min(p.y);
-        self.max.x = self.max.x.max(p.x);
-        self.max.y = self.max.y.max(p.y);
-    }
-
-    #[allow(dead_code)]
-    fn contains(&self, p: &Point2) -> bool {
-        p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-enum Direction {
-    North,
-    East,
-    South,
-    West,
-}
-
-#[allow(dead_code)]
-impl Direction {
-    fn rotate_right(&self) -> Self {
-        match self {
-            Self::North => Self::East,
-            Self::East => Self::South,
-            Self::South => Self::West,
-            Self::West => Self::North,
-        }
-    }
-
-    fn rotate_left(&self) -> Self {
-        self.rotate_right().rotate_right().rotate_right()
-    }
-
-    fn step(&self, p: &Point2) -> Point2 {
-        match self {
-            Self::North => Point2::new(p.x, p.y - 1),
-            Self::East => Point2::new(p.x + 1, p.y),
-            Self::South => Point2::new(p.x, p.y + 1),
-            Self::West => Point2::new(p.x - 1, p.y),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 enum Tile {
     Wall,
@@ -101,10 +9,10 @@ enum Tile {
 
 #[derive(Debug, Clone)]
 struct State {
-    grid: FxHashMap<Point2, Tile>,
-    bbox: BBox2,
-    start_at: Point2,
-    end_at: Point2,
+    grid: FxHashMap<Point2<i32>, Tile>,
+    bbox: BBox2<i32>,
+    start_at: Point2<i32>,
+    end_at: Point2<i32>,
 }
 
 impl State {
@@ -145,7 +53,7 @@ fn parse_input(input: String) -> State {
     state
 }
 
-fn count_steps(state: &State) -> Vec<(Point2, i32)> {
+fn count_steps(state: &State) -> Vec<(Point2<i32>, i32)> {
     let mut path = Vec::new();
     let mut visited = FxHashSet::default();
 
@@ -182,7 +90,7 @@ fn count_steps(state: &State) -> Vec<(Point2, i32)> {
     path
 }
 
-fn get_neighbors(state: &State, at: &Point2, radius: i32) -> Vec<Point2> {
+fn get_neighbors(state: &State, at: &Point2<i32>, radius: i32) -> Vec<Point2<i32>> {
     let mut neighbors = Vec::new();
 
     for x in (at.x - radius)..=(at.x + radius) {
@@ -211,10 +119,12 @@ fn find_cheats(state: &State, radius: i32) -> FxHashMap<i32, i32> {
     // This time, use Manhattan distance to fill in the jump cost.
     let mut state = state.clone();
     let forward_dists = count_steps(&state);
-    let forward_dists_lookup: FxHashMap<Point2, i32> = forward_dists.clone().into_iter().collect();
+    let forward_dists_lookup: FxHashMap<Point2<i32>, i32> =
+        forward_dists.clone().into_iter().collect();
     state.start_at = end_at;
     state.end_at = start_at;
-    let backward_dists_lookup: FxHashMap<Point2, i32> = count_steps(&state).into_iter().collect();
+    let backward_dists_lookup: FxHashMap<Point2<i32>, i32> =
+        count_steps(&state).into_iter().collect();
 
     let max_cost: i32 = forward_dists_lookup.len().try_into().unwrap();
 

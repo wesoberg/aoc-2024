@@ -2,87 +2,13 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use aoc_2024_rs::*;
 
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone, PartialOrd, Ord)]
-struct Point2 {
-    x: i32,
-    y: i32,
-}
-
-impl Point2 {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    fn min() -> Self {
-        Self::new(i32::MIN, i32::MIN)
-    }
-
-    fn max() -> Self {
-        Self::new(i32::MAX, i32::MAX)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct BBox2 {
-    min: Point2,
-    max: Point2,
-}
-
-impl BBox2 {
-    #[allow(dead_code)]
-    fn new(a: &Point2, b: &Point2) -> Self {
-        Self {
-            min: Point2::new(a.x.min(b.x), a.y.min(b.y)),
-            max: Point2::new(a.x.max(b.x), a.y.max(b.y)),
-        }
-    }
-
-    fn default() -> Self {
-        Self {
-            min: Point2::max(),
-            max: Point2::min(),
-        }
-    }
-
-    fn update(&mut self, p: &Point2) {
-        self.min.x = self.min.x.min(p.x);
-        self.min.y = self.min.y.min(p.y);
-        self.max.x = self.max.x.max(p.x);
-        self.max.y = self.max.y.max(p.y);
-    }
-
-    #[allow(dead_code)]
-    fn contains(&self, p: &Point2) -> bool {
-        p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-enum Direction {
-    North,
-    East,
-    South,
-    West,
-}
-
-impl Direction {
-    fn step(&self, p: &Point2) -> Point2 {
-        match self {
-            Self::North => Point2::new(p.x, p.y - 1),
-            Self::East => Point2::new(p.x + 1, p.y),
-            Self::South => Point2::new(p.x, p.y + 1),
-            Self::West => Point2::new(p.x - 1, p.y),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 struct State {
-    obstacles: Vec<Point2>,
-    grid: HashSet<Point2>,
-    bbox: BBox2,
-    start_at: Point2,
-    end_at: Point2,
+    obstacles: Vec<Point2<i32>>,
+    grid: HashSet<Point2<i32>>,
+    bbox: BBox2<i32>,
+    start_at: Point2<i32>,
+    end_at: Point2<i32>,
 }
 
 impl State {
@@ -136,7 +62,7 @@ fn pprint_grid(state: &State) -> String {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct Node {
     cost: i32,
-    position: Point2,
+    position: Point2<i32>,
 }
 
 impl Ord for Node {
@@ -154,7 +80,7 @@ impl PartialOrd for Node {
 }
 
 fn shortest_path(state: &State) -> Option<i32> {
-    let mut dist: HashMap<Point2, i32> = HashMap::new();
+    let mut dist: HashMap<Point2<i32>, i32> = HashMap::new();
 
     let mut heap = BinaryHeap::new();
 

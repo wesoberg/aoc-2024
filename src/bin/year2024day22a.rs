@@ -71,4 +71,3 @@ mod tests {
         assert_eq!(37327623, solve(&parsed));
     }
 }
-

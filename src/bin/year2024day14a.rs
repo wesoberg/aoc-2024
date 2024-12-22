@@ -3,65 +3,10 @@ use std::collections::HashMap;
 use aoc_2024_rs::*;
 use regex::Regex;
 
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
-struct Point2 {
-    x: i32,
-    y: i32,
-}
-
-impl Point2 {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    fn min() -> Self {
-        Self::new(i32::MIN, i32::MIN)
-    }
-
-    #[allow(dead_code)]
-    fn max() -> Self {
-        Self::new(i32::MAX, i32::MAX)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct BBox2 {
-    min: Point2,
-    max: Point2,
-}
-
-impl BBox2 {
-    #[allow(dead_code)]
-    fn new(a: &Point2, b: &Point2) -> Self {
-        Self {
-            min: Point2::new(a.x.min(b.x), a.y.min(b.y)),
-            max: Point2::new(a.x.max(b.x), a.y.max(b.y)),
-        }
-    }
-
-    fn default() -> Self {
-        Self {
-            min: Point2::max(),
-            max: Point2::min(),
-        }
-    }
-
-    fn update(&mut self, p: &Point2) {
-        self.min.x = self.min.x.min(p.x);
-        self.min.y = self.min.y.min(p.y);
-        self.max.x = self.max.x.max(p.x);
-        self.max.y = self.max.y.max(p.y);
-    }
-
-    fn contains(&self, p: &Point2) -> bool {
-        p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 struct State {
-    grid: Vec<(Point2, Point2)>,
-    bbox: BBox2,
+    grid: Vec<(Point2<i32>, Point2<i32>)>,
+    bbox: BBox2<i32>,
 }
 
 impl State {
@@ -98,7 +43,7 @@ fn parse_input(input: String) -> State {
 
 #[allow(dead_code)]
 fn pprint_grid(state: &State) {
-    let mut grid: HashMap<Point2, usize> = HashMap::new();
+    let mut grid: HashMap<Point2<i32>, usize> = HashMap::new();
     for (p, _) in &state.grid {
         grid.entry(*p).and_modify(|c| *c += 1).or_insert(1);
     }
@@ -114,7 +59,7 @@ fn pprint_grid(state: &State) {
     }
 }
 
-fn step(p: &Point2, v: &Point2, bbox: &BBox2) -> Point2 {
+fn step(p: &Point2<i32>, v: &Point2<i32>, bbox: &BBox2<i32>) -> Point2<i32> {
     let mut q = *p;
     q.x += v.x;
     q.y += v.y;
