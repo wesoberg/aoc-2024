@@ -38,7 +38,7 @@ fn get_direct_connections(connections: &Vec<(String, String)>) -> HashMap<String
     groups
 }
 
-fn get_groups_of_three(connections: &Vec<(String, String)>) -> Vec<HashSet<String>> {
+fn get_groups_of_three(connections: &Vec<(String, String)>) -> HashSet<(String, String, String)> {
     // Example of direct connections involving "aq":
     //
     // "aq": {"vc", "yn", "cg", "wq"},
@@ -49,32 +49,20 @@ fn get_groups_of_three(connections: &Vec<(String, String)>) -> Vec<HashSet<Strin
     //
     // Take aq,vc then find {vc,yn,cq,wq} ∩ {ub,aq,wq,tb} = {wq}, so aq,vc,wq is one 3-group.
 
-    let mut groups = Vec::new();
-
-    // Lots of trying to make the output deterministic because the tests would randomly fail. Turns
-    // out, of course, the direct children intersection of two machines may have [0,3] results (at
-    // least with the example input), so always calling .next() to get the first element from the
-    // (unordered) set was causing the problem.
-    //
-    // Side note: All this String cloning (I'm guessing) makes this take ~14 seconds. But it could
-    // be lots of small set operations, too...
+    let mut groups = HashSet::new();
 
     let direct_connections = get_direct_connections(connections);
-    let mut keys: Vec<String> = direct_connections.keys().cloned().collect();
-    keys.sort();
-
-    for lparent in &keys {
-        let lchildren = direct_connections.get(lparent).unwrap();
-        for rparent in keys.iter().filter(|k| lchildren.contains(*k)) {
+    for (lparent, lchildren) in &direct_connections {
+        for rparent in lchildren {
             let rchildren = direct_connections.get(rparent).unwrap();
-            let mut mchildren: Vec<String> = lchildren.intersection(rchildren).cloned().collect();
-            mchildren.sort();
-            for mchild in mchildren {
-                let group =
-                    HashSet::from([lparent.to_string(), rparent.to_string(), mchild.to_string()]);
-                if !groups.contains(&group) {
-                    groups.push(group);
-                }
+            for mchild in lchildren.intersection(rchildren) {
+                let mut group = [lparent, rparent, mchild];
+                group.sort();
+                groups.insert((
+                    group[0].to_string(),
+                    group[1].to_string(),
+                    group[2].to_string(),
+                ));
             }
         }
     }
@@ -85,7 +73,9 @@ fn get_groups_of_three(connections: &Vec<(String, String)>) -> Vec<HashSet<Strin
 fn solve(parsed: &Vec<(String, String)>) -> usize {
     get_groups_of_three(parsed)
         .iter()
-        .filter(|group| group.iter().any(|id| id.starts_with("t")))
+        .filter(|group| {
+            group.0.starts_with("t") || group.1.starts_with("t") || group.2.starts_with("t")
+        })
         .count()
 }
 
@@ -168,18 +158,18 @@ td-yn
         );
 
         let expected = vec![
-            HashSet::from(["aq".to_string(), "cg".to_string(), "yn".to_string()]),
-            HashSet::from(["aq".to_string(), "vc".to_string(), "wq".to_string()]),
-            HashSet::from(["co".to_string(), "de".to_string(), "ka".to_string()]),
-            HashSet::from(["co".to_string(), "de".to_string(), "ta".to_string()]),
-            HashSet::from(["co".to_string(), "ka".to_string(), "ta".to_string()]),
-            HashSet::from(["de".to_string(), "ka".to_string(), "ta".to_string()]),
-            HashSet::from(["kh".to_string(), "qp".to_string(), "ub".to_string()]),
-            HashSet::from(["qp".to_string(), "td".to_string(), "wh".to_string()]),
-            HashSet::from(["tb".to_string(), "vc".to_string(), "wq".to_string()]),
-            HashSet::from(["tc".to_string(), "td".to_string(), "wh".to_string()]),
-            HashSet::from(["td".to_string(), "wh".to_string(), "yn".to_string()]),
-            HashSet::from(["ub".to_string(), "vc".to_string(), "wq".to_string()]),
+            ("aq".to_string(), "cg".to_string(), "yn".to_string()),
+            ("aq".to_string(), "vc".to_string(), "wq".to_string()),
+            ("co".to_string(), "de".to_string(), "ka".to_string()),
+            ("co".to_string(), "de".to_string(), "ta".to_string()),
+            ("co".to_string(), "ka".to_string(), "ta".to_string()),
+            ("de".to_string(), "ka".to_string(), "ta".to_string()),
+            ("kh".to_string(), "qp".to_string(), "ub".to_string()),
+            ("qp".to_string(), "td".to_string(), "wh".to_string()),
+            ("tb".to_string(), "vc".to_string(), "wq".to_string()),
+            ("tc".to_string(), "td".to_string(), "wh".to_string()),
+            ("td".to_string(), "wh".to_string(), "yn".to_string()),
+            ("ub".to_string(), "vc".to_string(), "wq".to_string()),
         ];
         let actual = get_groups_of_three(&parsed);
         assert_eq!(expected.len(), actual.len());

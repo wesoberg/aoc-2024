@@ -87,16 +87,18 @@ fn get_largest_local_group(
 
 fn get_largest_global_group(connections: &Vec<(String, String)>) -> HashSet<String> {
     let direct_connections = get_direct_connections(connections);
-    let mut keys: Vec<String> = direct_connections.keys().cloned().collect();
-    keys.sort();
 
-    let mut groups: Vec<HashSet<String>> = keys
-        .iter()
-        .map(|parent| get_largest_local_group(parent, &direct_connections))
-        .collect();
+    let mut max_count = 0;
+    let mut max_group = HashSet::new();
+    for parent in direct_connections.keys() {
+        let group = get_largest_local_group(parent, &direct_connections);
+        if group.len() > max_count {
+            max_count = group.len();
+            max_group = group;
+        }
+    }
 
-    groups.sort_by_key(|group| group.len());
-    groups[groups.len() - 1].clone()
+    max_group
 }
 
 fn solve(parsed: &Vec<(String, String)>) -> String {
