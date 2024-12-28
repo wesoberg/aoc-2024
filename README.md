@@ -11,7 +11,7 @@ It's kitted out with:
 * Boots from external SSD over USB3
 * Runs Raspberry Pi OS Lite 64-bit (Debian 12 (bookworm))
 
-All activities are over SSH, and development happens in [Neovim](https://neovim.io/) (BTW).
+Development happens over SSH in [Neovim](https://neovim.io/) (BTW).
 
 ## timings
 
@@ -62,11 +62,38 @@ View it: `http://<machine-name>:9000/flamegraph.svg`
 
 ## takeaways
 
-* Hashing is really slow in Rust! This came up on 2024-06-b!
+* Hashing is really slow in Rust! This first came up on
+  [2024-06-b](src/bin/year2024day06b.rs) (which to be fair I should revisit,
+  that one was a slog for a while for me + Rust). As a result, I've
+  occasionally dropped in `FxHash*` to get a speed boost (shave off half a
+  second or more, in release mode). It's still kind of lame when the flamegraph
+  only shows hashing operations, though.
     * https://nnethercote.github.io/perf-book/hashing.html
 * The [itertools](https://docs.rs/itertools/latest/itertools/) crate can be
-  really slow! For 2024-07-b I had even materialized all the permutations for
-  caching. Turns out that's just a suboptimal approach to the problem
-  altogether (explicitly iterating permutations).
-
-
+  really slow! For [2024-07-b](src/bin/year2024day07b.rs) I had even
+  materialized all the permutations _for caching_ (which _was faster_). Turns
+  out that's just a suboptimal approach to the problem altogether (explicitly
+  generating permutations to then iterate).
+* As soon as I refactored ~10 days' worth of copypasta 2D grid utilities into
+  the shared lib, there were no more 2D grids. Wonderful. I did this refactor
+  while despairing at potential edge cases in my implementation for 2024-21-a
+  (which I've ended up saving as the last day to tackle).
+* "Inspect the input" came up at least twice. Always good to keep in mind, and
+  always something I try to avoid _anyway_, to my own peril. I must relearn the
+  lesson each time, it seems.
+* Most brutal problem of the year for me was
+  [2024-24-b](src/bin/year2024day24b.rs) because I refused to "study up on the
+  Foo Bar Baz" and wanted to tackle it as a relative idiot to "Foo Bar Baz"
+  (otherwise it felt unsatisfying for whatever reason). Though seeing some of
+  the generated images on the subreddit, and being able to make some
+  assumptions about the overall structure, was useful.
+  * Really bad idea to [clone in a recursive
+    function](docs/year2024day24b-flamegraph-highlight.png). :D
+* Spent much less time fighting the Rust compiler this year, that was nice,
+  though I did tactically avoid trying lifetimes again. I would like to go back
+  through and see what could be cleaned up, and maybe enhanced with more
+  Rust-isms.
+  * Moving the 2D grid utilities into the lib may have been my first real
+    start-to-finish foray into implementing my own generics. Wild that you
+    can't say "any whole number" type constraint in Rust without a crate! It's
+    all about the waddles and the quacks (_behavior_ expressed by traits)...
