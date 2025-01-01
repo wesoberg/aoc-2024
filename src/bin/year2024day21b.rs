@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use aoc_2024_rs::*;
+use cached::proc_macro::cached;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 enum Button {
@@ -153,22 +154,11 @@ fn get_paths(
 // 2(>):   v <<   A >>  ^ A   <   A > A  v  A   <  ^ AA > A   < v  AAA >  ^ A
 // 3(>): <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
 
+#[cached(
+    key = "String",
+    convert = r#"{ format!("{:?} {:?}", buttons, depth) }"#
+)]
 fn get_min_seq(keypad: &HashMap<Point2<i32>, Button>, buttons: &[Button], depth: usize) -> usize {
-    // This took so long. It ended up being so fiddly. First I started with only tracking counts
-    // and was getting incorrect results. Then switched to trying to materialize the sequences to
-    // visually debug, which helped reveal how to deal with the Activate buttons sprinkled around.
-    // Was still getting weird results like "going back to A" instead of "pushing A again" which
-    // made the sequences a lot longer than they should have been.
-    //
-    // Finally looked at some other random solutions that were doing exactly what I was doing, but
-    // without fear, without dedicated functions with near identical logic for numeric versus
-    // directional keypads (which had bothered me this entire time), etc., etc. So I made it very
-    // simple, knowing this was the right path, and knowing the correct fiddly bits of where to
-    // sprinkle Activates had been sorted by way of my pain, and it worked, this time.
-    //
-    // Near the end of AoC, I always overcomplicate things so much! With all the piecemeal
-    // functions and debug conditions/statements, it's hard to see the essence...
-
     if depth == 0 {
         return buttons.len();
     }
@@ -227,7 +217,7 @@ fn solve(parsed: &Vec<Vec<Button>>, depth: usize) -> usize {
 fn main() {
     let input = load_input(2024, 21);
     let parsed = parse_input(input);
-    let answer = solve(&parsed, 3);
+    let answer = solve(&parsed, 26);
     println!("Answer: {:?}", answer);
 }
 

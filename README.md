@@ -40,11 +40,11 @@ Average of 20 trials in release mode.
 | 2024 | 18  | 0.0022567033767700194 | 0.00218348503112793   |
 | 2024 | 19  | 0.04730072021484375   | 0.09182169437408447   |
 | 2024 | 20  | 0.007873153686523438  | 0.16768847703933715   |
-| 2024 | 21  |                       |                       |
+| 2024 | 21  | 0.00124891996383667   | 0.0024892091751098633 |
 | 2024 | 22  | 0.0092812180519104    | 0.21672009229660033   |
 | 2024 | 23  | 0.025630879402160644  | 0.02193518877029419   |
 | 2024 | 24  | 0.001909637451171875  | 3.255921506881714     |
-| 2024 | 25  | 0.0014955759048461913 |                       |
+| 2024 | 25  | 0.0014955759048461913 | 0.0000000000000000000 |
 ```
 
 ## deeper profiling
@@ -89,6 +89,10 @@ View it: `http://<machine-name>:9000/flamegraph.svg`
   assumptions about the overall structure, was useful.
   * Really bad idea to [clone in a recursive
     function](docs/year2024day24b-flamegraph-highlight.png). :D
+* The fiddly get-hung-up-and-despair day this year for me was
+  [2024-21](src/bin/year2024day21a.rs), which was quite simple in the end. The
+  information density of the description landed me in the wrong solar system at
+  the very start.
 * Spent much less time fighting the Rust compiler this year, that was nice,
   though I did tactically avoid trying lifetimes again. I would like to go back
   through and see what could be cleaned up, and maybe enhanced with more
